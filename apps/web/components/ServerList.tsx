@@ -56,8 +56,13 @@ function ServerRow({ server }: { server: ServerRow }) {
   }
 
   async function deleteServer() {
-    if (!confirm(`Delete server ${server.ipAddress}? Sites will be unlinked but not deleted.`)) return
-    await fetch(`/api/servers/${server.id}`, { method: 'DELETE' })
+    if (!confirm(`Delete server ${server.ipAddress}?`)) return
+    const res = await fetch(`/api/servers/${server.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      alert(body.error ?? 'Failed to delete server')
+      return
+    }
     router.refresh()
   }
 

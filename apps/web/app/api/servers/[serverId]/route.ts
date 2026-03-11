@@ -24,10 +24,19 @@ export const PATCH = withAuthAndErrors(async (req, { params }) => {
 })
 
 export const DELETE = withAuthAndErrors(async (_req, { params }) => {
-  const server = await db.server.findUnique({ where: { id: params['serverId'] } })
+  const server = await db.server.findUnique({
+    where: { id: params['serverId'] },
+    include: { _count: { select: { sites: true } } },
+  })
   if (!server) return NextResponse.json({ error: 'Server not found' }, { status: 404 })
 
-  // Sites will have serverId set to null via onDelete: SetNull
+  if (server._count.sites > 0) {
+    return NextResponse.json(
+      { error: `Cannot delete server: ${server._count.sites} site(s) are still linked to it. Remove or reassign those sites first.` },
+      { status: 409 }
+    )
+  }
+
   await db.server.delete({ where: { id: params['serverId'] } })
 
   return new NextResponse(null, { status: 204 })

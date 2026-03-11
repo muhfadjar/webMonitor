@@ -5,6 +5,7 @@ import { SslBadge } from '@/components/SslBadge'
 import { PageStatusBadge } from '@/components/StatusBadge'
 import { RecheckButton } from '@/components/RecheckButton'
 import { EditSiteForm } from '@/components/EditSiteForm'
+import { DeleteSiteButton } from '@/components/DeleteSiteButton'
 import { formatResponseTime, formatDate, timeAgo } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -52,6 +53,7 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
             pageCheckIntervalMinutes: site.pageCheckIntervalMinutes,
           }}
         />
+        <DeleteSiteButton siteId={site.id} domain={site.domain} />
       </div>
 
       {/* Info grid */}
