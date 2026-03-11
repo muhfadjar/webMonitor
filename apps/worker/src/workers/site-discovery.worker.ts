@@ -10,6 +10,7 @@ import { checkSsl } from '../lib/ssl'
 import { parseRobots } from '../lib/robots-parser'
 import { crawlSitemaps } from '../lib/sitemap-parser'
 import { checkAndTriggerAlerts } from '../lib/alerts'
+import { publishEvent } from '../lib/pubsub'
 
 const CONCURRENCY = Number(process.env.SITE_DISCOVERY_CONCURRENCY ?? 5)
 const PAGE_BATCH_SIZE = 500
@@ -56,9 +57,11 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
     if (httpResult.error || (httpResult.status && httpResult.status >= 500)) {
       await markSiteError(siteId, httpResult.error ?? `HTTP ${httpResult.status ?? 'error'}`)
       await checkAndTriggerAlerts({ siteId, type: 'SITE_DOWN', details: { reason: httpResult.error } })
+      await publishEvent({ type: 'error', siteId, payload: { reason: httpResult.error ?? `HTTP ${httpResult.status}` } })
       return
     }
     log('HTTP check done', { status: httpResult.status, responseTimeMs: httpResult.responseTimeMs })
+    await publishEvent({ type: 'http_done', siteId, payload: { status: httpResult.status, responseTimeMs: httpResult.responseTimeMs } })
 
     // ── Step 2: SSL certificate ──────────────────────────────────────────────
     const sslResult = await checkSsl(domain)
@@ -80,6 +83,7 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
       },
     })
     log('SSL check done', { isValid: sslResult.isValid, daysUntilExpiry: sslResult.daysUntilExpiry })
+    await publishEvent({ type: 'ssl_done', siteId, payload: { isValid: sslResult.isValid, daysUntilExpiry: sslResult.daysUntilExpiry } })
 
     // ── Step 3: robots.txt ───────────────────────────────────────────────────
     const robotsUrl = `https://${domain}/robots.txt`
@@ -103,6 +107,7 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
       },
     })
     log('robots.txt done', { isAccessible, sitemapsFound: parsed.sitemapUrls.length })
+    await publishEvent({ type: 'robots_done', siteId, payload: { isAccessible, sitemapsFound: parsed.sitemapUrls.length } })
 
     // ── Step 4 + 5: Sitemap crawl ────────────────────────────────────────────
     const seedUrls: string[] =
@@ -112,6 +117,7 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
 
     const { pages, sitemapsFetched } = await crawlSitemaps(seedUrls, domain)
     log('Sitemap crawl done', { pagesFound: pages.length, sitemapsFetched })
+    await publishEvent({ type: 'sitemap_fetched', siteId, payload: { pagesFound: pages.length, sitemapsFetched } })
 
     // ── Step 6: Bulk insert pages ────────────────────────────────────────────
     if (reindex) {
@@ -139,6 +145,7 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
       insertedCount += result.count
     }
     log('Pages inserted', { total: pageRecords.length, newlyInserted: insertedCount })
+    await publishEvent({ type: 'pages_indexed', siteId, payload: { total: pageRecords.length, newlyInserted: insertedCount } })
 
     // ── Step 7: Enqueue page-check jobs for pending pages ────────────────────
     const pendingPages = await db.page.findMany({
@@ -160,6 +167,7 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
       }
       await pageCheckQueue.addBulk(jobPayloads)
       log('Page-check jobs enqueued', { count: jobPayloads.length })
+      await publishEvent({ type: 'page_checks_queued', siteId, payload: { count: jobPayloads.length } })
     }
 
     // ── Step 8: Mark site active ─────────────────────────────────────────────
@@ -168,6 +176,7 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
       data: { status: 'ACTIVE', lastCheckedAt: new Date() },
     })
     log('Discovery complete')
+    await publishEvent({ type: 'complete', siteId })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(`[site-discovery] Unexpected error for ${domain}:`, message)

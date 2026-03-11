@@ -138,6 +138,9 @@ importers:
       fast-xml-parser:
         specifier: ^4.4.0
         version: 4.5.4
+      ioredis:
+        specifier: ^5.10.0
+        version: 5.10.0
       undici:
         specifier: ^6.19.2
         version: 6.23.0
@@ -352,9 +355,6 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
-
-  '@ioredis/commands@1.5.0':
-    resolution: {integrity: sha512-eUgLqrMf8nJkZxT24JvVRrQya1vZkQh8BBeYNwGDqa5I0VUi8ACx7uFvAaLxintokpTenkK6DASvo/bvNbBGow==}
 
   '@ioredis/commands@1.5.1':
     resolution: {integrity: sha512-JH8ZL/ywcJyR9MmJ5BNqZllXNZQqQbnVZOqpPQqE1vHiFgAw4NHbvE0FOduNU8IX9babitBT46571OnPTT0Zcw==}
@@ -1210,10 +1210,6 @@ packages:
     resolution: {integrity: sha512-HVBe9OFuqs+Z6n64q09PQvP1/R4Bm+30PAyyD4wIEqssh3v9L21QjCVk4kRLucMBcDokJTcLjsGeVRlq/nH6DA==}
     engines: {node: '>=12.22.0'}
 
-  ioredis@5.9.3:
-    resolution: {integrity: sha512-VI5tMCdeoxZWU5vjHWsiE/Su76JGhBvWF1MJnV9ZtGltHk9BmD48oDq8Tj8haZ85aceXZMxLNDQZRVo5QKNgXA==}
-    engines: {node: '>=12.22.0'}
-
   is-binary-path@2.1.0:
     resolution: {integrity: sha512-ZMERYes6pDydyuGidse7OsHxtbI7WVeUEozgR/g7rd0xUimYNlvZRE/K2MgZTjWy725IfelLeVcEM97mmtRGXw==}
     engines: {node: '>=8'}
@@ -1797,8 +1793,6 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
 
   '@floating-ui/utils@0.2.11': {}
-
-  '@ioredis/commands@1.5.0': {}
 
   '@ioredis/commands@1.5.1': {}
 
@@ -2391,7 +2385,7 @@ snapshots:
   bullmq@5.70.4:
     dependencies:
       cron-parser: 4.9.0
-      ioredis: 5.9.3
+      ioredis: 5.10.0
       msgpackr: 1.11.5
       node-abort-controller: 3.1.1
       semver: 7.7.4
@@ -2595,20 +2589,6 @@ snapshots:
   ioredis@5.10.0:
     dependencies:
       '@ioredis/commands': 1.5.1
-      cluster-key-slot: 1.1.2
-      debug: 4.4.3
-      denque: 2.1.0
-      lodash.defaults: 4.2.0
-      lodash.isarguments: 3.1.0
-      redis-errors: 1.2.0
-      redis-parser: 3.0.0
-      standard-as-callback: 2.1.0
-    transitivePeerDependencies:
-      - supports-color
-
-  ioredis@5.9.3:
-    dependencies:
-      '@ioredis/commands': 1.5.0
       cluster-key-slot: 1.1.2
       debug: 4.4.3
       denque: 2.1.0
