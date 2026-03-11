@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  VIEWER
+}
+
+enum SiteStatus {
+  PENDING
+  ACTIVE
+  ERROR
+  PAUSED
+}
+
+enum PageStatus {
+  PENDING
+  UP
+  DOWN
+  REDIRECT
+  ERROR
+}
+
+enum AlertType {
+  SSL_EXPIRY
+  SITE_DOWN
+  PAGE_DOWN
+  STATUS_CHANGE
+  CONTENT_CHANGE
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         Role     @default(ADMIN)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sites Site[]
+
+  @@map("users")
+}
+
+model Site {
+  id                   String     @id @default(uuid())
+  domain               String     @unique
+  displayName          String?
+  status               SiteStatus @default(PENDING)
+  checkIntervalMinutes Int        @default(60)
+  createdBy            String
+  lastCheckedAt        DateTime?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  user            User             @relation(fields: [createdBy], references: [id])
+  siteChecks      SiteCheck[]
+  sslCertificates SslCertificate[]
+  robotsEntries   RobotsEntry[]
+  pages           Page[]
+  alerts          Alert[]
+
+  @@index([status], name: "idx_sites_status")
+  @@index([domain], name: "idx_sites_domain")
+  @@map("sites")
+}
+
+model SiteCheck {
+  id             String   @id @default(uuid())
+  siteId         String
+  checkedAt      DateTime @default(now())
+  httpStatus     Int?
+  responseTimeMs Int?
+  redirectUrl    String?
+  serverHeader   String?
+  contentType    String?
+  xPoweredBy     String?
+  isReachable    Boolean
+  errorMessage   String?
+  rawHeaders     Json?
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, checkedAt(sort: Desc)], name: "idx_site_checks_site_id_checked_at")
+  @@map("site_checks")
+}
+
+model SslCertificate {
+  id                String   @id @default(uuid())
+  siteId            String
+  checkedAt         DateTime @default(now())
+  isValid           Boolean
+  issuer            String?
+  subject           String?
+  validFrom         DateTime?
+  validTo           DateTime?
+  daysUntilExpiry   Int?
+  serialNumber      String?
+  fingerprintSha256 String?
+  protocol          String?
+  cipherSuite       String?
+  subjectAltNames   String[]
+  errorMessage      String?
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, checkedAt(sort: Desc)], name: "idx_ssl_site_id_checked_at")
+  @@index([validTo], name: "idx_ssl_expiry")
+  @@map("ssl_certificates")
+}
+
+model RobotsEntry {
+  id            String   @id @default(uuid())
+  siteId        String
+  fetchedAt     DateTime @default(now())
+  isAccessible  Boolean
+  rawContent    String?
+  sitemapUrls   String[]
+  disallowRules Json?
+  allowRules    Json?
+  crawlDelay    Int?
+  httpStatus    Int?
+  errorMessage  String?
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId], name: "idx_robots_site_id")
+  @@map("robots_entries")
+}
+
+model Page {
+  id            String     @id @default(uuid())
+  siteId        String
+  url           String
+  urlHash       String
+  path          String?
+  /// Direct parent sitemap XML URL this page was found in
+  sourceSitemap String?
+  /// Full chain of sitemap XML URLs traversed to reach this page
+  sitemapChain  String[]
+  priority      Decimal?   @db.Decimal(3, 1)
+  changeFreq    String?
+  lastModified  DateTime?
+  status        PageStatus @default(PENDING)
+  lastCheckedAt DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  site       Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  pageChecks PageCheck[]
+  alerts     Alert[]
+
+  @@unique([siteId, urlHash], name: "uniq_pages_site_url_hash")
+  @@index([siteId, status], name: "idx_pages_site_id_status")
+  @@index([lastCheckedAt], name: "idx_pages_last_checked_at")
+  @@map("pages")
+}
+
+model PageCheck {
+  id             String   @id @default(uuid())
+  pageId         String
+  /// Denormalized for efficient site-wide queries
+  siteId         String
+  checkedAt      DateTime @default(now())
+  httpStatus     Int?
+  responseTimeMs Int?
+  isReachable    Boolean
+  redirectUrl    String?
+  contentHash    String?
+  contentLength  Int?
+  title          String?
+  errorMessage   String?
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, checkedAt(sort: Desc)], name: "idx_page_checks_page_id_checked_at")
+  @@index([siteId, checkedAt(sort: Desc)], name: "idx_page_checks_site_id_checked_at")
+  @@map("page_checks")
+}
+
+model Alert {
+  id                String    @id @default(uuid())
+  siteId            String?
+  pageId            String?
+  type              AlertType
+  thresholdDays     Int?
+  isActive          Boolean   @default(true)
+  notificationEmail String?
+  webhookUrl        String?
+  lastTriggeredAt   DateTime?
+  createdAt         DateTime  @default(now())
+
+  site Site? @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  page Page? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}

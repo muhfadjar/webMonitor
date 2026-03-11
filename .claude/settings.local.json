@@ -1,7 +1,25 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[0][''''text'''']\\)\")"
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[0][''''text'''']\\)\")",
+      "Bash(pnpm install:*)",
+      "Bash(npm --version)",
+      "Bash(npm install:*)",
+      "Bash(export PATH=\"$HOME/.nvm/versions/node/v22.14.0/bin:$PATH\")",
+      "Bash(pnpm --version)",
+      "Bash(pnpm --filter shared build)",
+      "Bash(pnpm approve-builds:*)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(/Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm install:*)",
+      "Bash(docker compose:*)",
+      "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" /Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm exec prisma migrate dev --name init)",
+      "Bash(/Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm add:*)",
+      "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" /Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm exec prisma db seed)",
+      "Bash(/Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm --filter shared typecheck)",
+      "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" /Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm exec prisma migrate status)",
+      "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" /Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm exec tsc --noEmit)",
+      "Bash(/Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm exec:*)",
+      "Bash(pkill -f \"next dev\")"
     ]
   }
 }

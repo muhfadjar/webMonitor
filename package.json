@@ -1,0 +1,31 @@
+{
+  "name": "webmonitor",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel --filter './apps/*' dev",
+    "build": "pnpm --filter shared build && pnpm --parallel --filter './apps/*' build",
+    "typecheck": "pnpm --recursive --parallel typecheck",
+    "lint": "pnpm --recursive --parallel lint",
+    "test": "pnpm --recursive --parallel test"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "ioredis": "^5.3.2"
+    },
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma"
+    ]
+  }
+}
