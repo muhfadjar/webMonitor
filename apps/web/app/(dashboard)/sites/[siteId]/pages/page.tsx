@@ -2,9 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { Card, CardContent } from '@/components/ui/card'
-import { PageStatusBadge } from '@/components/StatusBadge'
-import { RecheckButton } from '@/components/RecheckButton'
-import { formatResponseTime, timeAgo, truncateUrl } from '@/lib/utils'
+import { PagesTable } from '@/components/PagesTable'
 import type { Prisma, PageStatus } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -74,6 +72,19 @@ export default async function SitePagesPage({
     return `${base}${qs ? '?' + qs : ''}`
   }
 
+  // Serialize dates for the client component
+  const serializedPages = pages.map((p) => ({
+    id: p.id,
+    url: p.url,
+    status: p.status,
+    lastCheckedAt: p.lastCheckedAt?.toISOString() ?? null,
+    pageChecks: p.pageChecks.map((c) => ({
+      httpStatus: c.httpStatus,
+      responseTimeMs: c.responseTimeMs,
+      title: c.title,
+    })),
+  }))
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -104,65 +115,8 @@ export default async function SitePagesPage({
         </form>
       </div>
 
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          {pages.length === 0 ? (
-            <p className="px-6 py-8 text-center text-sm text-muted-foreground">No pages found.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30">
-                    <th className="px-6 py-3 text-left font-medium text-muted-foreground">URL</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">HTTP</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Response</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Last Check</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {pages.map((page) => {
-                    const check = page.pageChecks[0]
-                    return (
-                      <tr key={page.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                        <td className="px-6 py-2 max-w-xs">
-                          <div className="font-mono text-xs text-muted-foreground truncate" title={page.url}>
-                            {truncateUrl(page.url, 70)}
-                          </div>
-                          {check?.title && (
-                            <div className="text-xs truncate">{check.title}</div>
-                          )}
-                        </td>
-                        <td className="px-4 py-2">
-                          <PageStatusBadge status={page.status} />
-                        </td>
-                        <td className="px-4 py-2 tabular-nums text-muted-foreground">
-                          {check?.httpStatus ?? '—'}
-                        </td>
-                        <td className="px-4 py-2 tabular-nums text-muted-foreground">
-                          {check ? formatResponseTime(check.responseTimeMs) : '—'}
-                        </td>
-                        <td className="px-4 py-2 text-muted-foreground">
-                          {timeAgo(page.lastCheckedAt)}
-                        </td>
-                        <td className="px-4 py-2">
-                          <RecheckButton
-                            url={`/api/sites/${site.id}/pages/${page.id}/recheck`}
-                            label="Check"
-                            size="sm"
-                          />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Table with checkboxes */}
+      <PagesTable siteId={site.id} pages={serializedPages} />
 
       {/* Pagination */}
       {totalPages > 1 && (

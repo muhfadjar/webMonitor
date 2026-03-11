@@ -7,15 +7,22 @@ import { pageCheckWorker } from './workers/page-check.worker'
 import { sslCheckWorker } from './workers/ssl-check.worker'
 import { schedulerWorker } from './workers/scheduler.worker'
 
-const TICK_CRON = process.env.SCHEDULER_TICK_CRON ?? '* * * * *'       // every 1 min
-const SSL_SCAN_CRON = process.env.SCHEDULER_SSL_CRON ?? '0 2 * * *'    // 02:00 daily
-const CLEANUP_CRON = process.env.SCHEDULER_CLEANUP_CRON ?? '30 3 * * *' // 03:30 daily
+const TICK_CRON = process.env.SCHEDULER_TICK_CRON ?? '* * * * *'         // every 1 min
+const PAGE_TICK_CRON = process.env.SCHEDULER_PAGE_CRON ?? '*/5 * * * *'  // every 5 min
+const SSL_SCAN_CRON = process.env.SCHEDULER_SSL_CRON ?? '0 2 * * *'      // 02:00 daily
+const CLEANUP_CRON = process.env.SCHEDULER_CLEANUP_CRON ?? '30 3 * * *'  // 03:30 daily
 
 async function registerRepeatableJobs(): Promise<void> {
   await schedulerQueue.add(
     'check-due-sites',
     { type: 'check-due-sites' } satisfies SchedulerJobData,
     { repeat: { pattern: TICK_CRON }, jobId: 'scheduler:tick' }
+  )
+
+  await schedulerQueue.add(
+    'check-due-pages',
+    { type: 'check-due-pages' } satisfies SchedulerJobData,
+    { repeat: { pattern: PAGE_TICK_CRON }, jobId: 'scheduler:page-tick' }
   )
 
   await schedulerQueue.add(

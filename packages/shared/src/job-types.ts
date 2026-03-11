@@ -45,7 +45,7 @@ export interface SslCheckJobData {
 }
 
 export interface SchedulerJobData {
-  type: 'check-due-sites' | 'check-expiring-ssl' | 'cleanup-old-checks'
+  type: 'check-due-sites' | 'check-due-pages' | 'check-expiring-ssl' | 'cleanup-old-checks'
 }
 
 // ─────────────────────────────────────────────

@@ -5,8 +5,18 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth
   const { pathname } = req.nextUrl
 
-  // Always allow auth routes through
-  if (pathname.startsWith('/api/auth')) return NextResponse.next()
+  // Always allow auth routes and health check through
+  if (pathname.startsWith('/api/auth') || pathname === '/api/health') {
+    return NextResponse.next()
+  }
+
+  // API routes: return 401 JSON (not a redirect) when unauthenticated
+  if (pathname.startsWith('/api/')) {
+    if (!isLoggedIn) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    return NextResponse.next()
+  }
 
   // Redirect logged-in users away from /login
   if (pathname === '/login') {
@@ -16,7 +26,7 @@ export default auth((req) => {
     return NextResponse.next()
   }
 
-  // All other routes require authentication
+  // All other (page) routes require authentication — redirect to login
   if (!isLoggedIn) {
     const loginUrl = new URL('/login', req.nextUrl)
     loginUrl.searchParams.set('callbackUrl', pathname)

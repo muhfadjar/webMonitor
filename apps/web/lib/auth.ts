@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { LoginSchema } from '@/lib/validators'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   pages: {
     signIn: '/login',
     error: '/login',

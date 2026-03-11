@@ -1,11 +1,10 @@
 import { Worker, type Job } from 'bullmq'
 import { QUEUES, JOB_PRIORITY } from '@webmonitor/shared'
-import type { SchedulerJobData, SiteDiscoveryJobData, SslCheckJobData } from '@webmonitor/shared'
-import { connection, siteDiscoveryQueue, sslCheckQueue } from '../queues'
+import type { SchedulerJobData, SiteDiscoveryJobData, SslCheckJobData, PageCheckJobData } from '@webmonitor/shared'
+import { connection, siteDiscoveryQueue, pageCheckQueue, sslCheckQueue } from '../queues'
 import { db } from '../lib/db'
 
 const CONCURRENCY = 1
-const SITE_CHECK_INTERVAL_MINUTES = Number(process.env.SITE_CHECK_INTERVAL_MINUTES ?? 60)
 const SSL_EXPIRY_WARN_DAYS = 30
 const RETENTION_DAYS = Number(process.env.RETENTION_DAYS ?? 90)
 
@@ -26,6 +25,9 @@ async function processJob(job: Job<SchedulerJobData>): Promise<void> {
     case 'check-due-sites':
       await runSiteTick()
       break
+    case 'check-due-pages':
+      await runPageTick()
+      break
     case 'check-expiring-ssl':
       await runSslScan()
       break
@@ -38,41 +40,83 @@ async function processJob(job: Job<SchedulerJobData>): Promise<void> {
 }
 
 /**
- * Enqueue site-discovery jobs for sites that are overdue for a check.
+ * Enqueue site-discovery jobs for sites overdue for a health check.
+ * Uses each site's individual checkIntervalMinutes.
  */
 async function runSiteTick(): Promise<void> {
-  const overdueThreshold = new Date(
-    Date.now() - SITE_CHECK_INTERVAL_MINUTES * 60 * 1000
-  )
+  const now = Date.now()
 
   const sites = await db.site.findMany({
-    where: {
-      status: 'ACTIVE',
-      OR: [
-        { lastCheckedAt: null },
-        { lastCheckedAt: { lte: overdueThreshold } },
-      ],
-    },
-    select: { id: true, domain: true },
+    where: { status: 'ACTIVE' },
+    select: { id: true, domain: true, checkIntervalMinutes: true, lastCheckedAt: true },
   })
 
-  if (sites.length === 0) return
+  const due = sites.filter(
+    (s) =>
+      !s.lastCheckedAt ||
+      now - s.lastCheckedAt.getTime() >= s.checkIntervalMinutes * 60 * 1000
+  )
 
-  const jobs = sites.map((site) => ({
+  if (due.length === 0) return
+
+  const jobs = due.map((site) => ({
     name: `discover:${site.id}`,
     data: { siteId: site.id, domain: site.domain } satisfies SiteDiscoveryJobData,
     opts: { priority: JOB_PRIORITY.NORMAL },
   }))
 
   await siteDiscoveryQueue.addBulk(jobs)
-  console.log(`[scheduler] tick: enqueued ${jobs.length} site-discovery jobs`)
+  console.log(`[scheduler] site-tick: enqueued ${jobs.length} site-discovery jobs`)
+}
+
+/**
+ * Enqueue page-check jobs for pages overdue for a check.
+ * Uses each site's individual pageCheckIntervalMinutes.
+ */
+async function runPageTick(): Promise<void> {
+  const now = Date.now()
+
+  const sites = await db.site.findMany({
+    where: { status: 'ACTIVE' },
+    select: {
+      id: true,
+      pageCheckIntervalMinutes: true,
+      pages: {
+        where: { status: { not: 'PENDING' } },
+        select: { id: true, url: true, siteId: true, lastCheckedAt: true },
+      },
+    },
+  })
+
+  const pageJobs: Array<{ name: string; data: PageCheckJobData; opts: { priority: number } }> = []
+
+  for (const site of sites) {
+    const intervalMs = site.pageCheckIntervalMinutes * 60 * 1000
+    for (const page of site.pages) {
+      const isDue =
+        !page.lastCheckedAt ||
+        now - page.lastCheckedAt.getTime() >= intervalMs
+
+      if (isDue) {
+        pageJobs.push({
+          name: `page-check:${page.id}`,
+          data: { pageId: page.id, siteId: page.siteId, url: page.url },
+          opts: { priority: JOB_PRIORITY.LOW },
+        })
+      }
+    }
+  }
+
+  if (pageJobs.length === 0) return
+
+  await pageCheckQueue.addBulk(pageJobs)
+  console.log(`[scheduler] page-tick: enqueued ${pageJobs.length} page-check jobs`)
 }
 
 /**
  * Enqueue ssl-check jobs for certs expiring within SSL_EXPIRY_WARN_DAYS.
  */
 async function runSslScan(): Promise<void> {
-  // Find sites whose latest SSL cert is expiring soon (or has never been checked)
   const sites = await db.site.findMany({
     where: { status: 'ACTIVE' },
     select: {

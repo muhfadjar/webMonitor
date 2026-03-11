@@ -7,10 +7,13 @@ import { auth } from '@/lib/auth'
 
 export const GET = withAuthAndErrors(async (req) => {
   const params = SiteListSchema.parse(parseSearchParams(req))
-  const { page, limit, status } = params
+  const { page, limit, status, serverId } = params
   const skip = (page - 1) * limit
 
-  const where = status ? { status } : {}
+  const where = {
+    ...(status && { status }),
+    ...(serverId && { serverId }),
+  }
 
   const [sites, total] = await Promise.all([
     db.site.findMany({

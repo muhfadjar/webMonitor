@@ -41,11 +41,13 @@ export const CreateSiteSchema = z.object({
   domain: domainTransform,
   displayName: z.string().max(255).optional(),
   checkIntervalMinutes: z.coerce.number().int().min(5).max(10080).default(60),
+  pageCheckIntervalMinutes: z.coerce.number().int().min(60).max(10080).default(1440),
 })
 
 export const UpdateSiteSchema = z.object({
   displayName: z.string().max(255).optional(),
   checkIntervalMinutes: z.coerce.number().int().min(5).max(10080).optional(),
+  pageCheckIntervalMinutes: z.coerce.number().int().min(60).max(10080).optional(),
   status: z.enum(['ACTIVE', 'PAUSED']).optional(),
 })
 
@@ -82,6 +84,12 @@ export const PaginationSchema = z.object({
 
 export const SiteListSchema = PaginationSchema.extend({
   status: z.enum(['PENDING', 'ACTIVE', 'ERROR', 'PAUSED']).optional(),
+  serverId: z.string().uuid().optional(),
+})
+
+// ── Servers ──────────────────────────────────────────────────────────────────
+export const UpdateServerSchema = z.object({
+  name: z.string().max(255).nullable(),
 })
 
 export const PageListSchema = PaginationSchema.extend({

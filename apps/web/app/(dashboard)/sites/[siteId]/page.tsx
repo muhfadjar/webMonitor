@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SslBadge } from '@/components/SslBadge'
 import { PageStatusBadge } from '@/components/StatusBadge'
 import { RecheckButton } from '@/components/RecheckButton'
+import { EditSiteForm } from '@/components/EditSiteForm'
 import { formatResponseTime, formatDate, timeAgo } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -21,6 +22,7 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
       siteChecks: { orderBy: { checkedAt: 'desc' }, take: 10 },
       sslCertificates: { orderBy: { checkedAt: 'desc' }, take: 1 },
       robotsEntries: { orderBy: { fetchedAt: 'desc' }, take: 1 },
+      server: { select: { id: true, ipAddress: true, name: true } },
       _count: { select: { pages: true } },
     },
   })
@@ -39,9 +41,17 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
   return (
     <div className="space-y-6">
       {/* Action bar */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2 items-start">
         <RecheckButton url={`/api/sites/${site.id}/recheck`} label="Re-check now" />
         <RecheckButton url={`/api/sites/${site.id}/reindex`} label="Re-index pages" />
+        <EditSiteForm
+          siteId={site.id}
+          initialValues={{
+            displayName: site.displayName,
+            checkIntervalMinutes: site.checkIntervalMinutes,
+            pageCheckIntervalMinutes: site.pageCheckIntervalMinutes,
+          }}
+        />
       </div>
 
       {/* Info grid */}
@@ -111,27 +121,36 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
         </Card>
 
         {/* Server info */}
-        {latestCheck && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Server</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              {latestCheck.serverHeader && (
-                <p><span className="text-muted-foreground">Server:</span> {latestCheck.serverHeader}</p>
-              )}
-              {latestCheck.contentType && (
-                <p><span className="text-muted-foreground">Content-Type:</span> {latestCheck.contentType}</p>
-              )}
-              {latestCheck.xPoweredBy && (
-                <p><span className="text-muted-foreground">X-Powered-By:</span> {latestCheck.xPoweredBy}</p>
-              )}
-              {!latestCheck.serverHeader && !latestCheck.contentType && (
-                <p className="text-muted-foreground">No server info</p>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Server</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            {site.server && (
+              <p>
+                <span className="text-muted-foreground">IP:</span>{' '}
+                <Link href={`/sites?serverId=${site.server.id}`} className="font-mono hover:underline">
+                  {site.server.ipAddress}
+                </Link>
+                {site.server.name && (
+                  <span className="ml-2 text-muted-foreground">({site.server.name})</span>
+                )}
+              </p>
+            )}
+            {latestCheck?.serverHeader && (
+              <p><span className="text-muted-foreground">Server:</span> {latestCheck.serverHeader}</p>
+            )}
+            {latestCheck?.contentType && (
+              <p><span className="text-muted-foreground">Content-Type:</span> {latestCheck.contentType}</p>
+            )}
+            {latestCheck?.xPoweredBy && (
+              <p><span className="text-muted-foreground">X-Powered-By:</span> {latestCheck.xPoweredBy}</p>
+            )}
+            {!site.server && !latestCheck?.serverHeader && !latestCheck?.contentType && (
+              <p className="text-muted-foreground">No server info</p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Robots */}
         <Card>
@@ -162,7 +181,8 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
             <CardTitle className="text-sm font-medium text-muted-foreground">Monitoring</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
-            <p><span className="text-muted-foreground">Interval:</span> every {site.checkIntervalMinutes}m</p>
+            <p><span className="text-muted-foreground">Site check:</span> every {site.checkIntervalMinutes}m</p>
+            <p><span className="text-muted-foreground">Page check:</span> every {site.pageCheckIntervalMinutes}m</p>
             <p><span className="text-muted-foreground">Added:</span> {formatDate(site.createdAt)}</p>
             <p><span className="text-muted-foreground">Last checked:</span> {timeAgo(site.lastCheckedAt)}</p>
           </CardContent>

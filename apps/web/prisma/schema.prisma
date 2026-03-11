@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-1.1.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -43,6 +44,19 @@ enum AlertType {
 // Models
 // ─────────────────────────────────────────────
 
+model Server {
+  id        String   @id @default(uuid())
+  ipAddress String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sites Site[]
+
+  @@index([ipAddress], name: "idx_servers_ip")
+  @@map("servers")
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -62,13 +76,16 @@ model Site {
   domain               String     @unique
   displayName          String?
   status               SiteStatus @default(PENDING)
-  checkIntervalMinutes Int        @default(60)
-  createdBy            String
+  checkIntervalMinutes     Int        @default(60)
+  pageCheckIntervalMinutes Int        @default(1440)
+  serverId                 String?
+  createdBy                String
   lastCheckedAt        DateTime?
   createdAt            DateTime   @default(now())
   updatedAt            DateTime   @updatedAt
 
   user            User             @relation(fields: [createdBy], references: [id])
+  server          Server?          @relation(fields: [serverId], references: [id], onDelete: SetNull)
   siteChecks      SiteCheck[]
   sslCertificates SslCertificate[]
   robotsEntries   RobotsEntry[]
@@ -77,6 +94,7 @@ model Site {
 
   @@index([status], name: "idx_sites_status")
   @@index([domain], name: "idx_sites_domain")
+  @@index([serverId], name: "idx_sites_server_id")
   @@map("sites")
 }
 

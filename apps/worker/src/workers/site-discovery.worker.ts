@@ -1,5 +1,6 @@
 import { Worker, type Job } from 'bullmq'
 import crypto from 'crypto'
+import dns from 'dns/promises'
 import { URL } from 'url'
 import { QUEUES, JOB_PRIORITY } from '@webmonitor/shared'
 import type { SiteDiscoveryJobData, PageCheckJobData } from '@webmonitor/shared'
@@ -62,6 +63,20 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
     }
     log('HTTP check done', { status: httpResult.status, responseTimeMs: httpResult.responseTimeMs })
     await publishEvent({ type: 'http_done', siteId, payload: { status: httpResult.status, responseTimeMs: httpResult.responseTimeMs } })
+
+    // ── Step 1b: Detect server IP and upsert Server record ───────────────────
+    try {
+      const { address: ipAddress } = await dns.lookup(domain)
+      const server = await db.server.upsert({
+        where: { ipAddress },
+        update: {},
+        create: { ipAddress },
+      })
+      await db.site.update({ where: { id: siteId }, data: { serverId: server.id } })
+      log('IP detected', { ipAddress, serverId: server.id })
+    } catch (dnsErr) {
+      log('DNS lookup failed (non-fatal)', { err: dnsErr instanceof Error ? dnsErr.message : String(dnsErr) })
+    }
 
     // ── Step 2: SSL certificate ──────────────────────────────────────────────
     const sslResult = await checkSsl(domain)

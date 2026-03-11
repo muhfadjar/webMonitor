@@ -1,4 +1,5 @@
 FROM node:20-alpine AS base
+RUN apk add --no-cache openssl
 RUN npm install -g pnpm@9
 WORKDIR /app
 
@@ -18,7 +19,7 @@ COPY package.json pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/web/prisma ./apps/web/prisma/
 COPY packages/shared/ ./packages/shared/
-CMD ["sh", "-c", "pnpm --filter @webmonitor/web prisma migrate deploy && pnpm --filter @webmonitor/web prisma db seed"]
+CMD ["sh", "-c", "pnpm --filter @webmonitor/web exec prisma migrate deploy && pnpm --filter @webmonitor/web exec prisma generate && pnpm --filter @webmonitor/web exec prisma db seed"]
 
 # ---- builder stage: build shared then web ----
 FROM base AS builder
@@ -29,11 +30,15 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Regenerate Prisma client for the Linux container platform
+RUN pnpm --filter @webmonitor/web exec prisma generate
+
 RUN pnpm --filter @webmonitor/shared build
 RUN pnpm --filter @webmonitor/web build
 
 # ---- runner stage: minimal production image ----
 FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 ENV NODE_ENV=production

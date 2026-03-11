@@ -12,6 +12,7 @@ export function AddSiteForm() {
   const [domain, setDomain] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [interval, setInterval] = useState('60')
+  const [pageInterval, setPageInterval] = useState('1440')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -27,6 +28,7 @@ export function AddSiteForm() {
           domain,
           displayName: displayName || undefined,
           checkIntervalMinutes: Number(interval),
+          pageCheckIntervalMinutes: Number(pageInterval),
         }),
       })
 
@@ -90,7 +92,10 @@ export function AddSiteForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="interval">Check interval (minutes)</Label>
+            <Label htmlFor="interval">
+              Site check interval
+              <span className="ml-1 text-xs font-normal text-muted-foreground">(minutes, min 5)</span>
+            </Label>
             <Input
               id="interval"
               type="number"
@@ -99,6 +104,23 @@ export function AddSiteForm() {
               value={interval}
               onChange={(e) => setInterval(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">How often to check site health (HTTP, SSL, robots)</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="pageInterval">
+              Page check interval
+              <span className="ml-1 text-xs font-normal text-muted-foreground">(minutes, min 60)</span>
+            </Label>
+            <Input
+              id="pageInterval"
+              type="number"
+              min={60}
+              max={10080}
+              value={pageInterval}
+              onChange={(e) => setPageInterval(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">How often to recheck individual pages from sitemaps</p>
           </div>
         </CardContent>
         <CardFooter className="gap-3">
