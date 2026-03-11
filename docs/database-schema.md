@@ -139,7 +139,8 @@ All URLs discovered from sitemaps.
 | url | text | full URL |
 | url_hash | char(64) | SHA-256 of normalized URL, for dedup |
 | path | text | path portion only |
-| source_sitemap | text | which sitemap this came from |
+| source_sitemap | text | direct parent sitemap URL this URL was found in |
+| sitemap_chain | text[] | full crawl path, e.g. `[sitemap_index.xml, en/sitemap.xml]` |
 | priority | numeric(3,1) | from sitemap `<priority>` |
 | change_freq | varchar(20) | from sitemap `<changefreq>` |
 | last_modified | timestamptz | from sitemap `<lastmod>`, nullable |
@@ -317,6 +318,7 @@ model Page {
   urlHash        String
   path           String?
   sourceSitemap  String?
+  sitemapChain   String[]
   priority       Decimal?
   changeFreq     String?
   lastModified   DateTime?

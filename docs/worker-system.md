@@ -38,20 +38,68 @@ Triggered when a new site is added or a re-index is requested.
 4. Fetch `https://domain/robots.txt`:
    - Parse `User-agent`, `Disallow`, `Allow`, `Crawl-delay`, `Sitemap` directives
    - Extract all sitemap URLs
-5. Compile sitemap URL list (robots.txt `Sitemap:` lines + common fallbacks: `/sitemap.xml`, `/sitemap_index.xml`)
-6. For each sitemap URL:
-   - Fetch and parse XML
-   - If `<sitemapindex>` → recursively fetch child sitemaps
-   - If `<urlset>` → extract `<loc>`, `<lastmod>`, `<changefreq>`, `<priority>`
-7. Bulk-insert all URLs into `pages` table using `ON CONFLICT DO NOTHING`
-8. Enqueue a `page-check` job for each newly inserted page (batched)
+5. Compile seed sitemap URL list:
+   - `Sitemap:` entries from robots.txt
+   - Common fallbacks tried in order if none found: `/sitemap.xml`, `/sitemap_index.xml`, `/sitemap/sitemap.xml`
+6. Recursively crawl all sitemaps (see algorithm below)
+7. Bulk-insert collected page URLs into `pages` table in batches of 500 using `ON CONFLICT DO NOTHING`
+8. Enqueue a `page-check` job for each newly inserted page via `addBulk()`
 9. Update `sites` record: `status = 'active'`, `last_checked_at = now()`
+
+**Recursive Sitemap Crawl Algorithm:**
+
+The sitemap crawler uses an iterative queue (not call-stack recursion) to safely handle deep nesting and avoid stack overflows.
+
+```
+function crawlSitemaps(seedUrls):
+  queue       = seedUrls            // URLs yet to be fetched
+  visited     = Set()               // prevents re-fetching the same XML URL
+  collectedPages = []               // accumulated page records
+
+  while queue is not empty:
+    url = queue.shift()
+
+    if url in visited → skip
+    if visited.size >= MAX_SITEMAPS (default 200) → log warning, break
+    visited.add(url)
+
+    response = httpGet(url, timeout=15s)
+    if response fails → log error, continue to next URL (non-fatal)
+
+    xmlType = detect(response.body)
+
+    if xmlType == "sitemapindex":
+      // Contains <sitemap><loc> entries pointing to more XML files
+      childUrls = parse all <loc> values inside <sitemap> elements
+      for each childUrl:
+        if childUrl not in visited → queue.push(childUrl)
+
+    else if xmlType == "urlset":
+      // Contains <url><loc> entries — actual page URLs
+      pages = parse all <url> elements:
+        { url: <loc>, lastModified: <lastmod>, changeFreq: <changefreq>,
+          priority: <priority>, sourceSitemap: url }
+      collectedPages.push(...pages)
+
+    else:
+      log "unexpected XML format at {url}", continue
+
+  return deduplicate(collectedPages)   // by normalized URL
+```
+
+**Safeguards:**
+- `MAX_SITEMAPS = 200` — hard cap on number of XML files fetched per site
+- `MAX_PAGES = 50,000` — hard cap on pages collected per site; stops collecting once reached, logs warning
+- `visited` set prevents infinite loops from circular `<loc>` references between sitemaps
+- Each HTTP fetch has a 15s timeout independent of the page-check worker timeout
+- Non-XML responses (HTML error pages, 404s) at sitemap URLs are logged and skipped — do not abort the job
+- Sitemap URLs must share the same registered domain as the monitored site (prevents SSRF via crafted robots.txt)
 
 **Error handling:**
 - If root URL is unreachable → set `status = 'error'`, save error message
 - If SSL check fails → save error message in `ssl_certificates`, continue
 - If robots.txt returns 404 → save `is_accessible = false`, continue
-- Individual sitemap fetch failures are logged but don't abort the job
+- Individual sitemap fetch failures are logged per-URL but do not abort the job — partial results are saved
 
 ---
 

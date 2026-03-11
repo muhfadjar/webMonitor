@@ -119,6 +119,11 @@ export async function POST(req: Request) {
 - Always update `sites.status` and `sites.last_checked_at` at the end of a site discovery job
 - Log with structured context: `{ jobId, siteId, domain }` — no bare `console.log` strings
 - Respect per-domain rate limiting (5 req/sec default) via Redis token bucket in `lib/http.ts`
+- Sitemap parser uses an **iterative queue**, not call-stack recursion — handles unlimited nesting depth safely
+- Sitemap crawler maintains a `visited: Set<string>` to prevent re-fetching URLs and break circular references
+- Hard caps per crawl: `MAX_SITEMAPS=200` XML files, `MAX_PAGES=50000` page URLs (configurable via env)
+- Child sitemap URLs must be on the same registered domain as the monitored site — reject cross-domain refs
+- Both `<sitemapindex>` (XML pointers) and `<urlset>` (page URLs) are handled at any level of nesting
 
 ### Queues
 - Queue names are constants — defined once in `packages/shared/src/job-types.ts`, imported everywhere

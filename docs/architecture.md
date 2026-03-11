@@ -106,7 +106,7 @@ Worker picks up job
 1. **Concurrent workers** — BullMQ concurrency set to 20 workers per queue by default (configurable).
 2. **Batch DB inserts** — Pages discovered from sitemaps are inserted in bulk (`INSERT ... VALUES` batches of 500).
 3. **Prioritized queues** — Initial discovery jobs get higher priority than periodic re-checks.
-4. **Sitemap index support** — Sitemap index files (`<sitemapindex>`) are recursively parsed to enumerate all child sitemaps.
+4. **Recursive sitemap crawling** — An iterative queue processes both `<sitemapindex>` (pointers to more XML files) and `<urlset>` (actual page URLs) at unlimited nesting depth. A `visited` set prevents infinite loops. Capped at 200 XML files and 50,000 pages per site.
 5. **Deduplication** — URLs are normalized and de-duplicated before insertion using `ON CONFLICT DO NOTHING`.
 6. **Connection pooling** — PgBouncer-style pooling via Prisma's built-in connection pool.
 
