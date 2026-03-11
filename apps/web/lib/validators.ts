@@ -1,5 +1,22 @@
 import { z } from 'zod'
 
+// ── Private / reserved IP ranges blocked from monitoring ─────────────────────
+const BLOCKED_PATTERNS = [
+  /^localhost$/i,
+  /^127\./,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^169\.254\./,       // link-local
+  /^::1$/,             // IPv6 loopback
+  /^fc00:/i,           // IPv6 ULA
+  /\.(local|internal|intranet|corp|lan)$/i,
+]
+
+function isBlockedDomain(domain: string): boolean {
+  return BLOCKED_PATTERNS.some((re) => re.test(domain))
+}
+
 // ── Domain input: strip protocol + trailing slash, lowercase ─────────────────
 const domainTransform = z
   .string()
@@ -15,6 +32,9 @@ const domainTransform = z
     (val) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z]{2,})+/.test(val),
     { message: 'Must be a valid domain (e.g. example.com)' }
   )
+  .refine((val) => !isBlockedDomain(val), {
+    message: 'Private, local, and reserved domains cannot be monitored',
+  })
 
 // ── Sites ────────────────────────────────────────────────────────────────────
 export const CreateSiteSchema = z.object({

@@ -27,6 +27,9 @@ export default async function DashboardLayout({
         <nav className="flex-1 space-y-1 p-4">
           <NavItem href="/" label="Dashboard" />
           <NavItem href="/sites" label="Sites" />
+          {session.user.role === 'ADMIN' && (
+            <NavItem href="/admin/queues" label="Queue Monitor" />
+          )}
         </nav>
 
         <Separator />

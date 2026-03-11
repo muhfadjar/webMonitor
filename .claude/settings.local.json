@@ -27,7 +27,13 @@
       "Bash(do)",
       "Bash(echo \"=== $f ===\")",
       "Read(//Users/carbon-pc2/YCPS/Development/Self Project/monitoring/**)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(pnpm --filter @webmonitor/worker add nodemailer)",
+      "Bash(pnpm --filter @webmonitor/worker add -D @types/nodemailer)",
+      "Bash(pnpm --filter @webmonitor/web add @bull-board/api @bull-board/nextjs)",
+      "Bash(pnpm --filter @webmonitor/web add @bull-board/api @bull-board/hapi)",
+      "Bash(npm show:*)",
+      "Bash(pnpm --filter @webmonitor/web remove @bull-board/api @bull-board/hapi)"
     ]
   }
 }

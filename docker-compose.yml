@@ -44,7 +44,9 @@ services:
       - '3000:3000'
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-webmonitor}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-webmonitor}
-      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NODE_ENV: production
@@ -53,6 +55,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/api/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   worker:
     build:
@@ -62,7 +70,9 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-webmonitor}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-webmonitor}
-      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       PAGE_CHECK_CONCURRENCY: ${PAGE_CHECK_CONCURRENCY:-20}
       SITE_DISCOVERY_CONCURRENCY: ${SITE_DISCOVERY_CONCURRENCY:-5}
       SSL_CHECK_CONCURRENCY: ${SSL_CHECK_CONCURRENCY:-10}
@@ -71,12 +81,25 @@ services:
       MAX_SITEMAPS: ${MAX_SITEMAPS:-200}
       MAX_PAGES: ${MAX_PAGES:-50000}
       USER_AGENT: ${USER_AGENT:-WebMonitor/1.0}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      ALERT_COOLDOWN_HOURS: ${ALERT_COOLDOWN_HOURS:-1}
       NODE_ENV: production
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "require(\"ioredis\").createClient({host:\"redis\",port:6379}).ping().then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   pgadmin:
     image: dpage/pgadmin4:latest
