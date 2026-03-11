@@ -7,32 +7,71 @@
 - Docker + Docker Compose
 - Git
 
-## Initial Setup
+## Default Admin Account
+
+The database seed creates one admin account automatically on first startup.
+
+| Field    | Default value               |
+|----------|-----------------------------|
+| Email    | `admin@webmonitor.local`    |
+| Password | `admin123`                  |
+| Role     | ADMIN                       |
+
+> **Change the password after first login.**
+>
+> Override defaults via environment variables before first `docker compose up`:
+> ```env
+> SEED_ADMIN_EMAIL=you@example.com
+> SEED_ADMIN_PASSWORD=your-secure-password
+> SEED_ADMIN_NAME=Your Name
+> ```
+
+---
+
+## Docker (recommended — fully automated)
 
 ```bash
-# Clone and install dependencies
-git clone <repo>
-cd monitoring
+cp .env.example .env
+# Set NEXTAUTH_SECRET (required):
+echo "NEXTAUTH_SECRET=$(openssl rand -base64 32)" >> .env
+
+docker compose up -d
+```
+
+`docker compose up` automatically:
+1. Starts Postgres + Redis
+2. Runs `prisma migrate deploy` (applies all migrations)
+3. Runs `prisma db seed` (creates admin user if not exists)
+4. Starts the web app and worker
+
+Open http://localhost:3000 and log in with the credentials above.
+
+---
+
+## Local Development Setup
+
+```bash
+# Install dependencies
 pnpm install
 
 # Copy environment file
 cp .env.example .env
 # Edit .env with your values
 
-# Start infrastructure only (postgres + redis)
+# Start infrastructure only
 docker compose up -d postgres redis
 
 # Run database migrations
-pnpm --filter web prisma migrate dev
+pnpm --filter @webmonitor/web prisma migrate dev
 
 # Seed initial admin user
-pnpm --filter web prisma db seed
+pnpm --filter @webmonitor/web prisma db seed
 
 # Start Next.js dev server
-pnpm --filter web dev
+pnpm --filter @webmonitor/web dev
 
 # In another terminal, start worker in dev mode
-pnpm --filter worker dev
+pnpm --filter @webmonitor/worker dev
 ```
 
 ## Project Structure
@@ -165,10 +204,10 @@ pnpm lint
 pnpm test
 
 # DB operations
-pnpm --filter web prisma studio          # Open Prisma Studio UI
-pnpm --filter web prisma migrate dev     # Create migration from schema changes
-pnpm --filter web prisma migrate reset   # Reset DB (dev only)
-pnpm --filter web prisma generate        # Regenerate client after schema change
+pnpm --filter @webmonitor/web prisma studio          # Open Prisma Studio UI
+pnpm --filter @webmonitor/web prisma migrate dev     # Create migration from schema changes
+pnpm --filter @webmonitor/web prisma migrate reset   # Reset DB (dev only)
+pnpm --filter @webmonitor/web prisma generate        # Regenerate client after schema change
 
 # Docker (full stack)
 docker compose up -d
@@ -178,7 +217,7 @@ docker compose down -v  # reset
 ## Adding a New Feature Checklist
 
 1. Update `prisma/schema.prisma` if DB changes needed
-2. Run `pnpm --filter web prisma migrate dev --name <migration-name>`
+2. Run `pnpm --filter @webmonitor/web prisma migrate dev --name <migration-name>`
 3. Add/update API route handler in `app/api/`
 4. Add Zod validator in `lib/validators.ts`
 5. Update worker if background processing needed
@@ -194,7 +233,7 @@ lsof -i :3000 | kill -9 <PID>
 
 **Prisma client out of sync:**
 ```bash
-pnpm --filter web prisma generate
+pnpm --filter @webmonitor/web prisma generate
 ```
 
 **Redis connection refused:**
@@ -205,4 +244,4 @@ docker compose up -d redis
 **Worker not picking up jobs:**
 - Check `REDIS_URL` is correct in worker `.env`
 - Check queue names match between producer (web) and consumer (worker)
-- View BullMQ dashboard (optional) at `http://localhost:3000/admin/queues` (via bull-board)
+- View queue monitor at `http://localhost:3000/admin/queues` (admin login required)

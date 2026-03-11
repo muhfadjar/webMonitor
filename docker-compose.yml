@@ -34,6 +34,22 @@ services:
       timeout: 5s
       retries: 5
 
+  migrator:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: migrator
+    container_name: webmonitor-migrator
+    restart: 'no'
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-webmonitor}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-webmonitor}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@webmonitor.local}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Admin}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   app:
     build:
       context: .
@@ -55,6 +71,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/api/health || exit 1']
       interval: 30s
@@ -94,6 +112,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
     healthcheck:
       test: ['CMD-SHELL', 'node -e "require(\"ioredis\").createClient({host:\"redis\",port:6379}).ping().then(()=>process.exit(0)).catch(()=>process.exit(1))" 2>/dev/null || exit 1']
       interval: 30s

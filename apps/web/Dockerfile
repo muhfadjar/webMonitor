@@ -9,6 +9,17 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 RUN pnpm install --frozen-lockfile
 
+# ---- migrator stage: runs prisma migrate deploy + seed ----
+FROM base AS migrator
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/web/package.json ./apps/web/
+COPY apps/web/prisma ./apps/web/prisma/
+COPY packages/shared/ ./packages/shared/
+CMD ["sh", "-c", "pnpm --filter @webmonitor/web prisma migrate deploy && pnpm --filter @webmonitor/web prisma db seed"]
+
 # ---- builder stage: build shared then web ----
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
@@ -18,8 +29,8 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm --filter shared build
-RUN pnpm --filter web build
+RUN pnpm --filter @webmonitor/shared build
+RUN pnpm --filter @webmonitor/web build
 
 # ---- runner stage: minimal production image ----
 FROM node:20-alpine AS runner
