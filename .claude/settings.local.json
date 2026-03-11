@@ -22,7 +22,12 @@
       "Bash(pkill -f \"next dev\")",
       "Bash(pnpm --filter @webmonitor/worker exec tsc --noEmit)",
       "Bash(pnpm --filter @webmonitor/web exec tsc --noEmit)",
-      "Bash(pnpm --filter @webmonitor/worker add ioredis)"
+      "Bash(pnpm --filter @webmonitor/worker add ioredis)",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(echo \"=== $f ===\")",
+      "Read(//Users/carbon-pc2/YCPS/Development/Self Project/monitoring/**)",
+      "Bash(done)"
     ]
   }
 }
