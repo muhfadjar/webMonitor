@@ -19,7 +19,9 @@
       "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" /Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm exec prisma migrate status)",
       "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" /Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm exec tsc --noEmit)",
       "Bash(/Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm exec:*)",
-      "Bash(pkill -f \"next dev\")"
+      "Bash(pkill -f \"next dev\")",
+      "Bash(pnpm --filter @webmonitor/worker exec tsc --noEmit)",
+      "Bash(pnpm --filter @webmonitor/web exec tsc --noEmit)"
     ]
   }
 }
