@@ -3,12 +3,13 @@ import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { SiteStatusBadge } from '@/components/StatusBadge'
 
-const tabs = [
+const tabs: Array<{ href: string; label: string; external?: boolean }> = [
   { href: '', label: 'Overview' },
   { href: '/pages', label: 'Pages' },
   { href: '/ssl', label: 'SSL' },
   { href: '/robots', label: 'Robots' },
   { href: '/alerts', label: 'Alerts' },
+  { href: '/report', label: 'Report ↗', external: true },
 ]
 
 export default async function SiteLayout({
@@ -48,6 +49,7 @@ export default async function SiteLayout({
             <Link
               key={tab.href}
               href={`${base}${tab.href}`}
+              target={tab.external ? '_blank' : undefined}
               className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-muted-foreground transition-colors"
             >
               {tab.label}

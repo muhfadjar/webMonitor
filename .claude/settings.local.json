@@ -80,7 +80,8 @@
       "Bash(docker image:*)",
       "Bash(pnpm --filter @webmonitor/shared build)",
       "Bash(pnpm --filter @webmonitor/web exec prisma migrate dev --name add_server_model)",
-      "Bash(pnpm exec:*)"
+      "Bash(pnpm exec:*)",
+      "Bash(ls \"/Users/carbon-pc2/YCPS/Development/Self Project/monitoring/apps/web/app/\\(dashboard\\)/\")"
     ]
   }
 }
