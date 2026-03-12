@@ -80,6 +80,7 @@ model Site {
   pageCheckIntervalMinutes Int        @default(1440)
   serverId                 String?
   tags                     String[]
+  googleTags               Json?
   createdBy                String
   lastCheckedAt        DateTime?
   createdAt            DateTime   @default(now())

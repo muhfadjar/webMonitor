@@ -177,6 +177,16 @@ export interface PageWithLatestCheck extends Page {
   latestCheck: Pick<PageCheck, 'httpStatus' | 'responseTimeMs' | 'title'> | null
 }
 
+export interface GoogleTagsResult {
+  gtm: string[]
+  ga4: string[]
+  ua: string[]
+  ads: string[]
+  optimize: string[]
+  verificationCodes: string[]
+  detectedAt: string
+}
+
 export interface DashboardStats {
   totalSites: number
   sitesUp: number

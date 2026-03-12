@@ -9,6 +9,7 @@ import { EditSiteForm } from '@/components/EditSiteForm'
 import { DeleteSiteButton } from '@/components/DeleteSiteButton'
 import { formatResponseTime, formatDate, timeAgo } from '@/lib/utils'
 import { TagChip } from '@/components/TagInput'
+import type { GoogleTagsResult } from '@webmonitor/shared'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -268,6 +269,50 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
             )}
           </CardContent>
         </Card>
+
+        {/* Google Tags */}
+        {(() => {
+          const tags = site.googleTags as GoogleTagsResult | null
+          const rows: { label: string; ids: string[] }[] = []
+          if (tags?.gtm.length) rows.push({ label: 'GTM', ids: tags.gtm })
+          if (tags?.ga4.length) rows.push({ label: 'GA4', ids: tags.ga4 })
+          if (tags?.ua.length) rows.push({ label: 'UA', ids: tags.ua })
+          if (tags?.ads.length) rows.push({ label: 'Ads', ids: tags.ads })
+          if (tags?.optimize.length) rows.push({ label: 'Optimize', ids: tags.optimize })
+          if (tags?.verificationCodes.length) rows.push({ label: 'Verification', ids: tags.verificationCodes })
+          return (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Google Tags</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                {!tags ? (
+                  <p className="text-muted-foreground">Not scanned yet</p>
+                ) : rows.length === 0 ? (
+                  <p className="text-muted-foreground">None detected</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {rows.map(({ label, ids }) =>
+                      ids.map((id) => (
+                        <li key={`${label}-${id}`} className="flex items-center gap-2">
+                          <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground w-20 text-center shrink-0">
+                            {label}
+                          </span>
+                          <span className="font-mono text-xs truncate" title={id}>{id}</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+                {tags && (
+                  <p className="text-xs text-muted-foreground pt-1">
+                    Last scanned {timeAgo(new Date(tags.detectedAt))}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })()}
 
         {/* Site info */}
         <Card>

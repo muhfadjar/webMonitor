@@ -10,6 +10,7 @@ import { fetchSiteRoot } from '../lib/http'
 import { checkSsl } from '../lib/ssl'
 import { parseRobots } from '../lib/robots-parser'
 import { crawlSitemaps } from '../lib/sitemap-parser'
+import { detectGoogleTags } from '../lib/google-tag-detector'
 import { checkAndTriggerAlerts } from '../lib/alerts'
 import { publishEvent } from '../lib/pubsub'
 
@@ -40,6 +41,8 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
     const rootUrl = `https://${domain}`
     const httpResult = await fetchSiteRoot(rootUrl)
 
+    const googleTags = httpResult.body ? detectGoogleTags(httpResult.body) : null
+
     await db.siteCheck.create({
       data: {
         siteId,
@@ -54,6 +57,20 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
         rawHeaders: (httpResult.headers as object) ?? null,
       },
     })
+
+    if (googleTags) {
+      await db.site.update({
+        where: { id: siteId },
+        data: { googleTags: googleTags as object },
+      })
+      log('Google tags detected', {
+        gtm: googleTags.gtm.length,
+        ga4: googleTags.ga4.length,
+        ua: googleTags.ua.length,
+        ads: googleTags.ads.length,
+        verificationCodes: googleTags.verificationCodes.length,
+      })
+    }
 
     if (httpResult.error || (httpResult.status && httpResult.status >= 500)) {
       await markSiteError(siteId, httpResult.error ?? `HTTP ${httpResult.status ?? 'error'}`)
