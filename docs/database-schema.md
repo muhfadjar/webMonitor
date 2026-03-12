@@ -5,19 +5,39 @@ All tables use PostgreSQL 16. Managed via Prisma ORM with migration files.
 ## Entity Relationship Diagram
 
 ```
+servers
+  └──< sites (server_id)
+
 users
   └──< sites (created_by)
          ├──< site_checks
          ├──< ssl_certificates
          ├──< robots_entries
          └──< pages
-                └──< page_checks
-                └──< page_alerts
+                ├──< page_checks
+                ├──< seo_checks
+                └──< alerts (page_id)
 ```
 
 ---
 
 ## Tables
+
+### `servers`
+Tracks server IP addresses that host monitored sites. Sites optionally link to a server.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| ip_address | varchar UNIQUE | Server IP address |
+| name | varchar | optional friendly name |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+**Indexes:**
+- `idx_servers_ip` on `ip_address`
+
+---
 
 ### `users`
 Admin accounts (managed by NextAuth).
@@ -28,7 +48,7 @@ Admin accounts (managed by NextAuth).
 | email | varchar(255) UNIQUE | |
 | password_hash | varchar(255) | bcrypt |
 | name | varchar(100) | |
-| role | enum('admin','viewer') | default 'admin' |
+| role | enum('ADMIN','VIEWER') | default 'ADMIN' |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 
@@ -42,8 +62,12 @@ The root monitored domain.
 | id | uuid PK | |
 | domain | varchar(255) UNIQUE | normalized, no trailing slash |
 | display_name | varchar(255) | optional friendly name |
-| status | enum | 'pending','active','error','paused' |
-| check_interval_minutes | int | default 60 |
+| status | enum | 'PENDING','ACTIVE','ERROR','PAUSED' |
+| check_interval_minutes | int | site-level checks (HTTP/SSL/robots), **default 10** |
+| page_check_interval_minutes | int | per-page checks, **default 1440** (24h) |
+| server_id | uuid FK → servers | nullable |
+| tags | text[] | user-defined labels, e.g. `["production","ecommerce"]` |
+| google_tags | jsonb | detected Google tracking tags (see GoogleTagsResult) |
 | created_by | uuid FK → users | |
 | last_checked_at | timestamptz | nullable |
 | created_at | timestamptz | |
@@ -52,6 +76,19 @@ The root monitored domain.
 **Indexes:**
 - `idx_sites_status` on `status`
 - `idx_sites_domain` on `domain`
+- `idx_sites_server_id` on `server_id`
+
+**`google_tags` JSON structure:**
+```json
+{
+  "gtmIds": ["GTM-XXXXXX"],
+  "ga4Ids": ["G-XXXXXXXXXX"],
+  "uaIds": ["UA-XXXXXXXX-X"],
+  "adsIds": ["AW-XXXXXXXXXX"],
+  "optimizeIds": ["OPT-XXXXXXX"],
+  "searchConsoleVerification": "verification-token or null"
+}
+```
 
 ---
 
@@ -144,7 +181,10 @@ All URLs discovered from sitemaps.
 | priority | numeric(3,1) | from sitemap `<priority>` |
 | change_freq | varchar(20) | from sitemap `<changefreq>` |
 | last_modified | timestamptz | from sitemap `<lastmod>`, nullable |
-| status | enum | 'pending','up','down','redirect','error' |
+| status | enum | 'PENDING','UP','DOWN','REDIRECT','ERROR' |
+| has_security_issues | boolean | true if latest check found security issues, default false |
+| seo_score | int | 0–100 score from latest SEO check, nullable |
+| last_seo_checked_at | timestamptz | nullable |
 | last_checked_at | timestamptz | nullable |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
@@ -173,12 +213,43 @@ Individual page check results (the hot table — high write volume).
 | content_length | int | bytes |
 | title | text | `<title>` tag if HTML |
 | error_message | text | nullable |
+| security_issues | jsonb | detected security findings, nullable |
+| external_scripts | text[] | external script URLs found on the page |
 
 **Indexes:**
 - `idx_page_checks_page_id_checked_at` on `(page_id, checked_at DESC)`
 - `idx_page_checks_site_id_checked_at` on `(site_id, checked_at DESC)`
 
 > Recommend partitioning by month on `checked_at` once data grows.
+
+---
+
+### `seo_checks`
+SEO audit results per page. Written by the `seo-check` worker.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| page_id | uuid FK → pages | |
+| site_id | uuid FK → sites | denormalized for site-wide queries |
+| checked_at | timestamptz | |
+| score | int | 0–100 weighted SEO score |
+| issues | jsonb | array of `{ check, severity, message, recommendation }` |
+| title | text | extracted `<title>` value |
+| description | text | extracted `<meta name="description">` value |
+| h1_count | int | number of `<h1>` tags found |
+| canonical_url | text | value of `<link rel="canonical">` if present |
+| has_viewport | boolean | true if viewport meta tag is present |
+| has_og_tags | boolean | true if Open Graph tags are present |
+| has_schema | boolean | true if JSON-LD / Schema.org markup is present |
+| images_missing_alt | int | count of `<img>` tags without alt attribute |
+| is_indexable | boolean | false if `noindex` directive found |
+
+**Issue severity levels:** `error`, `warning`, `info`
+
+**Indexes:**
+- `idx_seo_checks_page_id_checked_at` on `(page_id, checked_at DESC)`
+- `idx_seo_checks_site_id` on `site_id`
 
 ---
 
@@ -190,7 +261,7 @@ Alert configurations and triggered events.
 | id | uuid PK | |
 | site_id | uuid FK → sites | nullable |
 | page_id | uuid FK → pages | nullable |
-| type | enum | 'ssl_expiry','site_down','page_down','status_change','content_change' |
+| type | enum | 'SSL_EXPIRY','SITE_DOWN','PAGE_DOWN','STATUS_CHANGE','CONTENT_CHANGE' |
 | threshold_days | int | for ssl_expiry alerts |
 | is_active | boolean | default true |
 | notification_email | varchar(255) | nullable |
@@ -200,11 +271,12 @@ Alert configurations and triggered events.
 
 ---
 
-## Prisma Schema (prisma/schema.prisma)
+## Prisma Schema (apps/web/prisma/schema.prisma)
 
 ```prisma
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-1.1.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -212,38 +284,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  role         Role     @default(ADMIN)
-  sites        Site[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-}
-
 enum Role {
   ADMIN
   VIEWER
-}
-
-model Site {
-  id                    String          @id @default(uuid())
-  domain                String          @unique
-  displayName           String?
-  status                SiteStatus      @default(PENDING)
-  checkIntervalMinutes  Int             @default(60)
-  createdBy             String
-  user                  User            @relation(fields: [createdBy], references: [id])
-  lastCheckedAt         DateTime?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
-  siteChecks            SiteCheck[]
-  sslCertificates       SslCertificate[]
-  robotsEntries         RobotsEntry[]
-  pages                 Page[]
-  alerts                Alert[]
 }
 
 enum SiteStatus {
@@ -251,87 +294,6 @@ enum SiteStatus {
   ACTIVE
   ERROR
   PAUSED
-}
-
-model SiteCheck {
-  id              String   @id @default(uuid())
-  siteId          String
-  site            Site     @relation(fields: [siteId], references: [id])
-  checkedAt       DateTime @default(now())
-  httpStatus      Int?
-  responseTimeMs  Int?
-  redirectUrl     String?
-  serverHeader    String?
-  contentType     String?
-  xPoweredBy      String?
-  isReachable     Boolean
-  errorMessage    String?
-  rawHeaders      Json?
-
-  @@index([siteId, checkedAt(sort: Desc)])
-}
-
-model SslCertificate {
-  id               String   @id @default(uuid())
-  siteId           String
-  site             Site     @relation(fields: [siteId], references: [id])
-  checkedAt        DateTime @default(now())
-  isValid          Boolean
-  issuer           String?
-  subject          String?
-  validFrom        DateTime?
-  validTo          DateTime?
-  daysUntilExpiry  Int?
-  serialNumber     String?
-  fingerprintSha256 String?
-  protocol         String?
-  cipherSuite      String?
-  subjectAltNames  String[]
-  errorMessage     String?
-
-  @@index([siteId, checkedAt(sort: Desc)])
-  @@index([validTo])
-}
-
-model RobotsEntry {
-  id            String   @id @default(uuid())
-  siteId        String
-  site          Site     @relation(fields: [siteId], references: [id])
-  fetchedAt     DateTime @default(now())
-  isAccessible  Boolean
-  rawContent    String?
-  sitemapUrls   String[]
-  disallowRules Json?
-  allowRules    Json?
-  crawlDelay    Int?
-  httpStatus    Int?
-  errorMessage  String?
-
-  @@index([siteId])
-}
-
-model Page {
-  id             String      @id @default(uuid())
-  siteId         String
-  site           Site        @relation(fields: [siteId], references: [id])
-  url            String
-  urlHash        String
-  path           String?
-  sourceSitemap  String?
-  sitemapChain   String[]
-  priority       Decimal?
-  changeFreq     String?
-  lastModified   DateTime?
-  status         PageStatus  @default(PENDING)
-  lastCheckedAt  DateTime?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  pageChecks     PageCheck[]
-  alerts         Alert[]
-
-  @@unique([siteId, urlHash])
-  @@index([siteId, status])
-  @@index([lastCheckedAt])
 }
 
 enum PageStatus {
@@ -342,31 +304,149 @@ enum PageStatus {
   ERROR
 }
 
-model PageCheck {
-  id             String   @id @default(uuid())
-  pageId         String
-  page           Page     @relation(fields: [pageId], references: [id])
-  siteId         String
-  checkedAt      DateTime @default(now())
-  httpStatus     Int?
-  responseTimeMs Int?
-  isReachable    Boolean
-  redirectUrl    String?
-  contentHash    String?
-  contentLength  Int?
-  title          String?
-  errorMessage   String?
+enum AlertType {
+  SSL_EXPIRY
+  SITE_DOWN
+  PAGE_DOWN
+  STATUS_CHANGE
+  CONTENT_CHANGE
+}
 
-  @@index([pageId, checkedAt(sort: Desc)])
-  @@index([siteId, checkedAt(sort: Desc)])
+model Server {
+  id        String   @id @default(uuid())
+  ipAddress String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sites     Site[]
+
+  @@index([ipAddress], name: "idx_servers_ip")
+  @@map("servers")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         Role     @default(ADMIN)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  sites        Site[]
+
+  @@map("users")
+}
+
+model Site {
+  id                       String     @id @default(uuid())
+  domain                   String     @unique
+  displayName              String?
+  status                   SiteStatus @default(PENDING)
+  checkIntervalMinutes     Int        @default(10)
+  pageCheckIntervalMinutes Int        @default(1440)
+  serverId                 String?
+  tags                     String[]
+  googleTags               Json?
+  createdBy                String
+  lastCheckedAt            DateTime?
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+
+  user            User             @relation(fields: [createdBy], references: [id])
+  server          Server?          @relation(fields: [serverId], references: [id], onDelete: SetNull)
+  siteChecks      SiteCheck[]
+  sslCertificates SslCertificate[]
+  robotsEntries   RobotsEntry[]
+  pages           Page[]
+  alerts          Alert[]
+
+  @@index([status], name: "idx_sites_status")
+  @@index([domain], name: "idx_sites_domain")
+  @@index([serverId], name: "idx_sites_server_id")
+  @@map("sites")
+}
+
+model Page {
+  id                String     @id @default(uuid())
+  siteId            String
+  url               String
+  urlHash           String
+  path              String?
+  sourceSitemap     String?
+  sitemapChain      String[]
+  priority          Decimal?   @db.Decimal(3, 1)
+  changeFreq        String?
+  lastModified      DateTime?
+  status            PageStatus @default(PENDING)
+  lastCheckedAt     DateTime?
+  hasSecurityIssues Boolean    @default(false)
+  seoScore          Int?
+  lastSeoCheckedAt  DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  site       Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  pageChecks PageCheck[]
+  seoChecks  SeoCheck[]
+  alerts     Alert[]
+
+  @@unique([siteId, urlHash], name: "uniq_pages_site_url_hash")
+  @@index([siteId, status], name: "idx_pages_site_id_status")
+  @@index([lastCheckedAt], name: "idx_pages_last_checked_at")
+  @@map("pages")
+}
+
+model PageCheck {
+  id              String   @id @default(uuid())
+  pageId          String
+  siteId          String
+  checkedAt       DateTime @default(now())
+  httpStatus      Int?
+  responseTimeMs  Int?
+  isReachable     Boolean
+  redirectUrl     String?
+  contentHash     String?
+  contentLength   Int?
+  title           String?
+  errorMessage    String?
+  securityIssues  Json?
+  externalScripts String[]
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, checkedAt(sort: Desc)], name: "idx_page_checks_page_id_checked_at")
+  @@index([siteId, checkedAt(sort: Desc)], name: "idx_page_checks_site_id_checked_at")
+  @@map("page_checks")
+}
+
+model SeoCheck {
+  id               String   @id @default(uuid())
+  pageId           String
+  siteId           String
+  checkedAt        DateTime @default(now())
+  score            Int
+  issues           Json
+  title            String?
+  description      String?
+  h1Count          Int?
+  canonicalUrl     String?
+  hasViewport      Boolean?
+  hasOgTags        Boolean?
+  hasSchema        Boolean?
+  imagesMissingAlt Int?
+  isIndexable      Boolean?
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, checkedAt(sort: Desc)], name: "idx_seo_checks_page_id_checked_at")
+  @@index([siteId], name: "idx_seo_checks_site_id")
+  @@map("seo_checks")
 }
 
 model Alert {
   id                String    @id @default(uuid())
   siteId            String?
-  site              Site?     @relation(fields: [siteId], references: [id])
   pageId            String?
-  page              Page?     @relation(fields: [pageId], references: [id])
   type              AlertType
   thresholdDays     Int?
   isActive          Boolean   @default(true)
@@ -374,13 +454,10 @@ model Alert {
   webhookUrl        String?
   lastTriggeredAt   DateTime?
   createdAt         DateTime  @default(now())
-}
 
-enum AlertType {
-  SSL_EXPIRY
-  SITE_DOWN
-  PAGE_DOWN
-  STATUS_CHANGE
-  CONTENT_CHANGE
+  site Site? @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  page Page? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
 }
 ```

@@ -46,6 +46,13 @@ export default async function DashboardLayout({
             Sign out
           </Link>
         </div>
+
+        <Separator />
+
+        {/* Copyright */}
+        <div className="p-4 text-xs text-muted-foreground">
+          <p>© {new Date().getFullYear()} <Link href="https://github.com/muhfadjar/webMonitor" target="_blank" rel="noopener noreferrer" className="hover:underline">muhfadjar</Link></p>
+        </div>
       </aside>
 
       {/* Main content */}

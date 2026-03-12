@@ -11,6 +11,7 @@ Redis
 ├── queue:site-discovery     (concurrency: 5)
 ├── queue:page-check         (concurrency: 20)
 ├── queue:ssl-check          (concurrency: 10)
+├── queue:seo-check          (concurrency: 10)
 └── queue:scheduler          (concurrency: 1)
 ```
 
@@ -44,7 +45,8 @@ Triggered when a new site is added or a re-index is requested.
 6. Recursively crawl all sitemaps (see algorithm below)
 7. Bulk-insert collected page URLs into `pages` table in batches of 500 using `ON CONFLICT DO NOTHING`
 8. Enqueue a `page-check` job for each newly inserted page via `addBulk()`
-9. Update `sites` record: `status = 'active'`, `last_checked_at = now()`
+9. Detect Google tracking tags from the root URL HTML (GTM, GA4, Universal Analytics, Google Ads, Optimize, Search Console verification) — save to `sites.google_tags`
+10. Update `sites` record: `status = 'active'`, `last_checked_at = now()`
 
 **Recursive Sitemap Crawl Algorithm:**
 
@@ -133,7 +135,51 @@ Processes individual page health checks. High concurrency (20 parallel workers).
 
 ---
 
-### 3. SSL Check Worker (`ssl-check` queue)
+### 3. SEO Check Worker (`seo-check` queue)
+
+Analyzes on-page SEO factors for individual pages. Enqueued after a page check or manually via the UI.
+
+**Steps:**
+1. HTTP GET the page URL
+2. Parse HTML and extract SEO signals:
+   - `<title>` tag value and length
+   - `<meta name="description">` value and length
+   - Number of `<h1>` tags
+   - `<link rel="canonical">` URL
+   - Viewport meta tag presence
+   - Open Graph tags (`og:title`, `og:description`, etc.)
+   - JSON-LD / Schema.org structured data
+   - Count of `<img>` tags missing `alt` attribute
+   - `noindex` directive (meta robots or X-Robots-Tag header)
+3. Score each check (0–100 weighted total) with a severity level: `error`, `warning`, or `info`
+4. Insert record into `seo_checks`
+5. Update `pages.seo_score` and `pages.last_seo_checked_at`
+
+**SEO score weights (approximate):**
+| Check | Weight | Severity if failing |
+|---|---|---|
+| Title present & 10–60 chars | 20 | error |
+| Meta description present & 50–160 chars | 15 | warning |
+| Exactly one H1 | 15 | warning |
+| Viewport meta tag | 10 | warning |
+| Open Graph tags | 10 | info |
+| Schema.org markup | 10 | info |
+| Canonical URL present | 10 | info |
+| No images missing alt | 5 | warning |
+| Page is indexable | 5 | error |
+
+**Job data:**
+```json
+{
+  "pageId": "uuid",
+  "siteId": "uuid",
+  "url": "https://example.com/about"
+}
+```
+
+---
+
+### 4. SSL Check Worker (`ssl-check` queue)
 
 Dedicated SSL-only checks (run on schedule independent of full site checks).
 
@@ -145,14 +191,14 @@ Dedicated SSL-only checks (run on schedule independent of full site checks).
 
 ---
 
-### 4. Scheduler Worker (`scheduler` queue)
+### 5. Scheduler Worker (`scheduler` queue)
 
 Runs a cron-like process to enqueue periodic checks.
 
 **Schedule logic:**
-- Every minute: query `sites` where `status = 'active'` AND `last_checked_at + check_interval_minutes <= now()`
-- For each due site: enqueue `site-discovery` job (or lighter site-only check)
-- Every 5 minutes: enqueue pending `page-check` jobs for pages that haven't been checked in their site's interval
+- Every minute: query `sites` where `status = 'active'` AND `last_checked_at + check_interval_minutes <= now()` — enqueue `site-discovery` job (or lighter site-only check)
+- Every 5 minutes: enqueue pending `page-check` jobs for pages where `last_checked_at + site.page_check_interval_minutes <= now()`
+  - Note: `checkIntervalMinutes` (default **10 min**) governs site-level checks; `pageCheckIntervalMinutes` (default **1440 min / 24h**) governs per-page checks independently
 
 **Cron jobs (via BullMQ's `repeat` option):**
 | Job | Schedule | Description |
@@ -189,6 +235,7 @@ Runs a cron-like process to enqueue periodic checks.
 | site-discovery | 3 | Exponential: 1min, 5min, 15min |
 | page-check | 2 | Fixed: 30s |
 | ssl-check | 3 | Exponential: 1min, 5min |
+| seo-check | 2 | Fixed: 30s |
 | scheduler | 1 | No retry |
 
 ---

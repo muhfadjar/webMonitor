@@ -9,7 +9,7 @@ app/
 ├── (auth)/
 │   └── login/                  # Login page
 ├── (dashboard)/
-│   ├── layout.tsx              # Sidebar + nav layout
+│   ├── layout.tsx              # Sidebar + nav layout with copyright footer
 │   ├── page.tsx                # Dashboard overview
 │   ├── sites/
 │   │   ├── page.tsx            # Sites list
@@ -27,6 +27,10 @@ app/
 │   │       │   └── page.tsx    # Robots.txt viewer
 │   │       └── alerts/
 │   │           └── page.tsx    # Alert settings
+│   └── (report)/
+│       └── sites/[siteId]/
+│           └── report/
+│               └── page.tsx    # Printable site report
 └── api/                        # API routes (not UI)
 ```
 
@@ -62,9 +66,14 @@ app/
 ---
 
 ### Sites List (`/sites`)
-- Table: Domain, Status, Pages, Uptime %, Avg Response Time, SSL Expires, Actions
+- Table: Domain, Status, Tags, Pages, Uptime %, Avg Response Time, SSL Expires, Actions
 - Status filter tabs: All / Active / Error / Paused / Pending
 - Search by domain
+- **Tag chips** displayed per row — color-coded by tag name
+- **Import/Export toolbar** (top-right):
+  - **Export** — downloads all sites as `.xlsx`
+  - **Import** — upload `.xlsx` to bulk-add sites; shows per-row results modal
+  - **Download Template** — get example `.xlsx` with correct column headers
 - Add Site button → opens `/sites/new`
 - Row click → site detail page
 
@@ -74,7 +83,9 @@ app/
 Form fields:
 - **Domain** (required) — input with validation hint, strips protocol if entered
 - **Display Name** (optional)
-- **Check Interval** — dropdown: 5min / 15min / 30min / 1h / 6h / 24h
+- **Check Interval** — dropdown for site-level checks (HTTP/SSL/robots): 5min / 10min / 15min / 30min / 1h / 6h / 24h (**default 10 min**)
+- **Page Check Interval** — dropdown for per-page checks: same options (**default 24h / 1440 min**)
+- **Tags** — tag input with colored chips, press Enter or comma to add
 - Submit → shows progress toast → redirects to site detail
 
 ---
@@ -91,12 +102,21 @@ Form fields:
 - SSL Status
 
 **Tabs:**
-1. **Overview** — server info, response headers, robots.txt summary
+1. **Overview** — server info, response headers, robots.txt summary, **Google Tags card**, security findings
 2. **Pages** → links to `/sites/[siteId]/pages`
 3. **SSL** → links to `/sites/[siteId]/ssl`
 4. **Robots.txt** → links to `/sites/[siteId]/robots`
 5. **Alerts** → links to `/sites/[siteId]/alerts`
 6. **History** — site check history chart + table
+
+**Google Tags card** (on Overview tab):
+- Displays detected Google tracking tags if found during last crawl
+- Shows GTM container IDs, GA4 measurement IDs, Universal Analytics IDs, Google Ads IDs, Optimize IDs, Search Console verification
+- Empty state shown if no Google tags detected
+
+**Security Findings panel** (on Overview tab):
+- Lists latest pages with security issues flagged
+- Links to individual page detail
 
 **Response Time Chart:**
 - Line chart of last 30 checks
@@ -117,8 +137,15 @@ Form fields:
 - HTTP Status (badge)
 - Response Time
 - Title (from last check)
+- **SEO Score** — color-coded badge: green (≥80), yellow (≥60), red (<60), grey if not yet checked
 - Last Checked
 - Actions: Re-check
+
+**Expandable SEO detail panel** (click row):
+- Lists all SEO issues with severity icons (error / warning / info)
+- Shows recommendations per issue
+- Displays title, description, h1 count, canonical URL, viewport, OG tags, schema, indexability
+- Re-analyze button to trigger a new SEO check
 
 **Pagination** with page size selector.
 
@@ -127,6 +154,8 @@ Form fields:
 ### Single Page Detail (`/sites/[siteId]/pages/[pageId]`)
 - Full URL, source sitemap, status badge
 - Latest check: status, response time, title, content hash
+- **SEO Score badge** with link to expand full SEO detail
+- **Security issues** summary if `hasSecurityIssues = true`
 - Response time history chart (last 20 checks)
 - Check history table: time, status, response time, content change indicator
 
@@ -167,6 +196,15 @@ Form fields:
 
 ---
 
+### Printable Site Report (`/sites/[siteId]/report`)
+- Print-optimized layout (no sidebar/nav)
+- Summary: domain, check date, HTTP status, SSL status
+- Page stats breakdown
+- SEO summary across all pages
+- Footer: `WebMonitor · domain · © year muhfadjar`
+
+---
+
 ## UI Components
 
 | Component | Usage |
@@ -178,6 +216,9 @@ Form fields:
 | `<JobProgressToast>` | Real-time discovery progress notification |
 | `<DomainInput>` | Auto-strips protocol, validates hostname |
 | `<PageStatusFilters>` | Multi-select filter pills |
+| `<TagInput>` | Tag chip input — press Enter or comma to add; color-coded chips |
+| `<SitesImportExport>` | Export/import sites as .xlsx with results modal |
+| `<PagesTable>` | Full pages table with SEO score badges and expandable SEO detail panel |
 
 ---
 

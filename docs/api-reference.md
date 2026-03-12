@@ -25,6 +25,7 @@ List all monitored sites.
 | Param | Type | Description |
 |---|---|---|
 | status | string | Filter by status: `pending,active,error,paused` |
+| tags | string | Comma-separated tag filter (matches any) |
 | page | int | Pagination page (default 1) |
 | limit | int | Results per page (default 20, max 100) |
 
@@ -37,7 +38,18 @@ List all monitored sites.
       "domain": "example.com",
       "displayName": "Example Site",
       "status": "active",
-      "checkIntervalMinutes": 60,
+      "checkIntervalMinutes": 10,
+      "pageCheckIntervalMinutes": 1440,
+      "tags": ["production", "ecommerce"],
+      "serverId": "uuid or null",
+      "googleTags": {
+        "gtmIds": ["GTM-XXXXXX"],
+        "ga4Ids": ["G-XXXXXXXXXX"],
+        "uaIds": [],
+        "adsIds": [],
+        "optimizeIds": [],
+        "searchConsoleVerification": null
+      },
       "lastCheckedAt": "2024-01-15T10:30:00Z",
       "createdAt": "2024-01-01T00:00:00Z",
       "latestCheck": {
@@ -73,13 +85,17 @@ Add a new site for monitoring.
 {
   "domain": "example.com",
   "displayName": "Example Site",
-  "checkIntervalMinutes": 60
+  "checkIntervalMinutes": 10,
+  "pageCheckIntervalMinutes": 1440,
+  "tags": ["production"]
 }
 ```
 
 **Validation:**
 - `domain` — required, must be a valid hostname (no protocol, no path)
-- `checkIntervalMinutes` — optional, min 5, max 10080 (1 week)
+- `checkIntervalMinutes` — optional, min 5, max 10080 (1 week), **default 10**
+- `pageCheckIntervalMinutes` — optional, min 5, max 10080, **default 1440** (24h)
+- `tags` — optional, array of strings
 
 **Response 201:**
 ```json
@@ -104,7 +120,11 @@ Get full details for a single site.
   "domain": "example.com",
   "displayName": "Example Site",
   "status": "active",
-  "checkIntervalMinutes": 60,
+  "checkIntervalMinutes": 10,
+  "pageCheckIntervalMinutes": 1440,
+  "tags": ["production"],
+  "serverId": "uuid or null",
+  "googleTags": { ... },
   "lastCheckedAt": "2024-01-15T10:30:00Z",
   "latestCheck": { ... },
   "latestSsl": { ... },
@@ -133,6 +153,8 @@ Update site settings.
 {
   "displayName": "New Name",
   "checkIntervalMinutes": 30,
+  "pageCheckIntervalMinutes": 720,
+  "tags": ["staging"],
   "status": "paused"
 }
 ```
@@ -162,6 +184,43 @@ Re-fetch sitemaps and re-index all pages (clears existing pages, re-discovers).
 **Response 202:**
 ```json
 { "jobId": "bull-job-id", "message": "Re-index queued" }
+```
+
+---
+
+### GET `/api/sites/export`
+Download all sites as an Excel (.xlsx) file.
+
+**Response 200:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+Excel columns: `domain`, `displayName`, `checkIntervalMinutes`, `pageCheckIntervalMinutes`, `tags`, `status`, `serverIp`, `serverName`
+
+---
+
+### POST `/api/sites/import`
+Bulk-import sites from an Excel (.xlsx) file.
+
+**Request:** `multipart/form-data` with a `file` field containing the `.xlsx`.
+
+**Excel columns:**
+| Column | Required | Notes |
+|---|---|---|
+| domain | yes | Valid hostname, no protocol |
+| displayName | no | Optional friendly name |
+| checkIntervalMinutes | no | Default 10 if omitted |
+| pageCheckIntervalMinutes | no | Default 1440 if omitted |
+
+**Limits:** Max 500 sites per import.
+
+**Response 200:**
+```json
+{
+  "imported": 12,
+  "skipped": 2,
+  "errors": [
+    { "row": 5, "domain": "bad domain", "error": "Invalid hostname" }
+  ]
+}
 ```
 
 ---
@@ -270,7 +329,10 @@ List all pages discovered for a site.
       "status": "up",
       "priority": 0.8,
       "changeFreq": "monthly",
+      "hasSecurityIssues": false,
+      "seoScore": 87,
       "lastCheckedAt": "2024-01-15T10:30:00Z",
+      "lastSeoCheckedAt": "2024-01-15T11:00:00Z",
       "latestCheck": {
         "httpStatus": 200,
         "responseTimeMs": 180,
@@ -294,12 +356,16 @@ Get details for a single page including check history.
   "url": "https://example.com/about",
   "status": "up",
   "sourceSitemap": "https://example.com/sitemap.xml",
+  "hasSecurityIssues": false,
+  "seoScore": 87,
   "checks": [
     {
       "checkedAt": "2024-01-15T10:30:00Z",
       "httpStatus": 200,
       "responseTimeMs": 180,
-      "contentHash": "abc123..."
+      "contentHash": "abc123...",
+      "securityIssues": null,
+      "externalScripts": []
     }
   ]
 }
@@ -309,6 +375,21 @@ Get details for a single page including check history.
 
 ### POST `/api/sites/:id/pages/:pageId/recheck`
 Trigger immediate re-check for a single page.
+
+---
+
+### POST `/api/sites/:id/pages/seo-analyze-selected`
+Trigger SEO analysis for a selected list of pages.
+
+**Request body:**
+```json
+{ "pageIds": ["uuid1", "uuid2"] }
+```
+
+**Response 202:**
+```json
+{ "queued": 2 }
+```
 
 ---
 
@@ -396,7 +477,8 @@ Get current queue stats (admin only).
   "queues": {
     "site-discovery": { "waiting": 0, "active": 1, "completed": 42, "failed": 0 },
     "page-check": { "waiting": 156, "active": 20, "completed": 8432, "failed": 3 },
-    "ssl-check": { "waiting": 0, "active": 2, "completed": 84, "failed": 0 }
+    "ssl-check": { "waiting": 0, "active": 2, "completed": 84, "failed": 0 },
+    "seo-check": { "waiting": 12, "active": 5, "completed": 320, "failed": 0 }
   }
 }
 ```

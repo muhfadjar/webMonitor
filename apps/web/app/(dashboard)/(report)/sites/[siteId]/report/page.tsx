@@ -427,7 +427,7 @@ export default async function SiteReportPage({ params }: { params: { siteId: str
 
           {/* Footer */}
           <div className="border-t border-gray-200 pt-4 text-xs text-gray-400 flex justify-between">
-            <span>WebMonitor · {site.domain}</span>
+            <span>WebMonitor · {site.domain} · © {new Date().getFullYear()} <a href="https://github.com/muhfadjar/webMonitor" target="_blank" rel="noopener noreferrer" className="hover:underline">muhfadjar</a></span>
             <span>{reportDate}</span>
           </div>
         </div>
