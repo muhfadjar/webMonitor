@@ -215,3 +215,8 @@ Full documentation is in [`docs/`](docs/):
 - [`docs/worker-system.md`](docs/worker-system.md) — queue and worker design
 - [`docs/frontend-pages.md`](docs/frontend-pages.md) — UI pages and components
 - [`docs/docker-setup.md`](docs/docker-setup.md) — Docker Compose and deployment
+
+## Commit rules
+
+1. Don't mention claude or anthropic in commit message
+2. Make point what changes
