@@ -374,12 +374,18 @@ export function PagesTable({ siteId, pages }: PagesTableProps) {
                           aria-label={`Select ${page.url}`}
                         />
                       </td>
-                      <td className="px-4 py-2 max-w-xs">
-                        <div className="font-mono text-xs text-muted-foreground truncate" title={page.url}>
+                      <td className="px-4 py-2 max-w-xs" onClick={(e) => e.stopPropagation()}>
+                        <a
+                          href={page.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-xs text-muted-foreground truncate block hover:text-primary hover:underline underline-offset-2"
+                          title={page.url}
+                        >
                           {truncateUrl(page.url, 70)}
-                        </div>
+                        </a>
                         {check?.title && (
-                          <div className="text-xs truncate">{check.title}</div>
+                          <div className="text-xs truncate text-muted-foreground">{check.title}</div>
                         )}
                       </td>
                       <td className="px-4 py-2">
