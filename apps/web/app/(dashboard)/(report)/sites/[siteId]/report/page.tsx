@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
 import { formatDate, formatResponseTime, timeAgo } from '@/lib/utils'
 import { PrintButton } from '@/components/PrintButton'
@@ -25,12 +26,27 @@ export default async function SiteReportPage({ params }: { params: { siteId: str
   if (!site) notFound()
 
   // Page counts
-  const [pagesUp, pagesDown, pagesError, pagesPending] = await Promise.all([
+  const [pagesUp, pagesDown, pagesError, pagesPending, pagesWithSecurityIssues] = await Promise.all([
     db.page.count({ where: { siteId: site.id, status: 'UP' } }),
     db.page.count({ where: { siteId: site.id, status: 'DOWN' } }),
     db.page.count({ where: { siteId: site.id, status: 'ERROR' } }),
     db.page.count({ where: { siteId: site.id, status: 'PENDING' } }),
+    db.page.count({ where: { siteId: site.id, hasSecurityIssues: true } }),
   ])
+
+  // Security findings
+  const securityFindings = pagesWithSecurityIssues > 0
+    ? await db.pageCheck.findMany({
+        where: { siteId: site.id, NOT: { securityIssues: { equals: Prisma.DbNull } } },
+        orderBy: { checkedAt: 'desc' },
+        take: 50,
+        select: {
+          securityIssues: true,
+          checkedAt: true,
+          page: { select: { url: true } },
+        },
+      })
+    : []
 
   // Pages with issues (DOWN or ERROR)
   const issuePages = await db.page.findMany({
@@ -320,6 +336,55 @@ export default async function SiteReportPage({ params }: { params: { siteId: str
               <p className="text-sm text-gray-400">No pages indexed yet.</p>
             ) : (
               <AllPagesTable siteId={site.id} />
+            )}
+          </section>
+
+          {/* ── Security Findings ────────────────────────────────────── */}
+          <section>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+              Security Scan
+            </h2>
+            {pagesWithSecurityIssues === 0 ? (
+              <div className="border border-green-200 bg-green-50 rounded-lg px-5 py-4 text-sm text-green-700 font-medium">
+                No security issues detected across all pages.
+              </div>
+            ) : (
+              <div className="border border-red-200 rounded-lg overflow-hidden">
+                <div className="bg-red-50 px-5 py-3 border-b border-red-200">
+                  <span className="text-sm font-semibold text-red-700">
+                    {pagesWithSecurityIssues} page{pagesWithSecurityIssues !== 1 ? 's' : ''} flagged with security issues
+                  </span>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-4 py-2.5 text-left font-semibold text-gray-600 text-xs">Page</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-600 text-xs w-32">Type</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-600 text-xs">Detail</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-600 text-xs w-24">Detected</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {securityFindings.map((f, fi) => {
+                      const issues = f.securityIssues as Array<{ type: string; detail: string }> | null ?? []
+                      return issues.map((issue, ii) => (
+                        <tr key={`${fi}-${ii}`} className={fi % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                          <td className="px-4 py-2 text-xs font-mono text-gray-600 break-all max-w-[200px]">
+                            {f.page.url}
+                          </td>
+                          <td className="px-3 py-2 text-xs font-semibold text-red-700 whitespace-nowrap">
+                            {issue.type.replace(/_/g, ' ')}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-700">{issue.detail}</td>
+                          <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">
+                            {timeAgo(f.checkedAt)}
+                          </td>
+                        </tr>
+                      ))
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
 

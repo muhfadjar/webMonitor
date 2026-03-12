@@ -6,6 +6,7 @@ export const QUEUES = {
   SITE_DISCOVERY: 'site-discovery',
   PAGE_CHECK: 'page-check',
   SSL_CHECK: 'ssl-check',
+  SEO_CHECK: 'seo-check',
   SCHEDULER: 'scheduler',
 } as const
 
@@ -42,6 +43,12 @@ export interface PageCheckJobData {
 export interface SslCheckJobData {
   siteId: string
   domain: string
+}
+
+export interface SeoCheckJobData {
+  pageId: string
+  siteId: string
+  url: string
 }
 
 export interface SchedulerJobData {

@@ -81,7 +81,13 @@
       "Bash(pnpm --filter @webmonitor/shared build)",
       "Bash(pnpm --filter @webmonitor/web exec prisma migrate dev --name add_server_model)",
       "Bash(pnpm exec:*)",
-      "Bash(ls \"/Users/carbon-pc2/YCPS/Development/Self Project/monitoring/apps/web/app/\\(dashboard\\)/\")"
+      "Bash(ls \"/Users/carbon-pc2/YCPS/Development/Self Project/monitoring/apps/web/app/\\(dashboard\\)/\")",
+      "Bash(find '/Users/carbon-pc2/YCPS/Development/Self Project/monitoring' -name index.d.ts -path *prisma/client*)",
+      "Bash(node -e \"const { PrismaClient } = require\\(''''@prisma/client''''\\); const p = new PrismaClient\\(\\); console.log\\(typeof p.pageCheck.findFirst\\)\")",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5432/webmonitor\" pnpm exec prisma migrate dev --name add_seo_check)",
+      "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" pnpm exec prisma migrate dev --name add_seo_check)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm tsc:*)"
     ]
   }
 }

@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SslBadge } from '@/components/SslBadge'
@@ -33,11 +34,29 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
   const latestSsl = site.sslCertificates[0]
   const latestRobots = site.robotsEntries[0]
 
-  const [pagesUp, pagesDown, pagesError] = await Promise.all([
+  const [pagesUp, pagesDown, pagesError, pagesWithSecurityIssues] = await Promise.all([
     db.page.count({ where: { siteId: site.id, status: 'UP' } }),
     db.page.count({ where: { siteId: site.id, status: 'DOWN' } }),
     db.page.count({ where: { siteId: site.id, status: 'ERROR' } }),
+    db.page.count({ where: { siteId: site.id, hasSecurityIssues: true } }),
   ])
+
+  // Latest security findings across all pages
+  const securityFindings = pagesWithSecurityIssues > 0
+    ? await db.pageCheck.findMany({
+        where: {
+          siteId: site.id,
+          NOT: { securityIssues: { equals: Prisma.DbNull } },
+        },
+        orderBy: { checkedAt: 'desc' },
+        take: 5,
+        select: {
+          securityIssues: true,
+          checkedAt: true,
+          page: { select: { url: true } },
+        },
+      })
+    : []
 
   return (
     <div className="space-y-6">
@@ -119,6 +138,39 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
             <Link href={`/sites/${site.id}/pages`} className="text-xs text-primary hover:underline">
               View all pages →
             </Link>
+          </CardContent>
+        </Card>
+
+        {/* Security */}
+        <Card className={pagesWithSecurityIssues > 0 ? 'border-red-300 bg-red-50/40' : ''}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Security</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            {pagesWithSecurityIssues === 0 ? (
+              <p className="text-green-700 font-medium">No issues detected</p>
+            ) : (
+              <>
+                <p className="text-red-700 font-bold text-lg">{pagesWithSecurityIssues}</p>
+                <p className="text-red-600 text-xs">page{pagesWithSecurityIssues !== 1 ? 's' : ''} flagged</p>
+                {securityFindings.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    {securityFindings.map((f, i) => {
+                      const issues = f.securityIssues as Array<{ type: string; detail: string }> | null
+                      return (
+                        <li key={i} className="truncate" title={issues?.[0]?.detail}>
+                          <span className="font-mono text-red-600">⚠</span>{' '}
+                          {issues?.[0]?.detail ?? 'Unknown issue'}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+                <Link href={`/sites/${site.id}/pages?security=1`} className="text-xs text-primary hover:underline">
+                  View flagged pages →
+                </Link>
+              </>
+            )}
           </CardContent>
         </Card>
 

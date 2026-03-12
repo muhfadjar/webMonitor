@@ -4,6 +4,7 @@ import type {
   SiteDiscoveryJobData,
   PageCheckJobData,
   SslCheckJobData,
+  SeoCheckJobData,
   SchedulerJobData,
 } from '@webmonitor/shared'
 
@@ -25,6 +26,10 @@ export const pageCheckQueue = new Queue<PageCheckJobData, unknown, string>(
 
 export const sslCheckQueue = new Queue<SslCheckJobData, unknown, string>(
   QUEUES.SSL_CHECK, { connection }
+)
+
+export const seoCheckQueue = new Queue<SeoCheckJobData, unknown, string>(
+  QUEUES.SEO_CHECK, { connection }
 )
 
 export const schedulerQueue = new Queue<SchedulerJobData, unknown, string>(

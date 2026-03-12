@@ -4,6 +4,7 @@ import type {
   SiteDiscoveryJobData,
   PageCheckJobData,
   SslCheckJobData,
+  SeoCheckJobData,
 } from '@webmonitor/shared'
 
 // BullMQ accepts a connection URL string directly — avoids ioredis version conflicts
@@ -39,6 +40,11 @@ export const pageCheckQueue = new Queue<PageCheckJobData, unknown, string>(
 
 export const sslCheckQueue = new Queue<SslCheckJobData, unknown, string>(
   QUEUES.SSL_CHECK,
+  { connection, defaultJobOptions }
+)
+
+export const seoCheckQueue = new Queue<SeoCheckJobData, unknown, string>(
+  QUEUES.SEO_CHECK,
   { connection, defaultJobOptions }
 )
 

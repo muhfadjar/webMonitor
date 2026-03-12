@@ -174,13 +174,17 @@ model Page {
   priority      Decimal?   @db.Decimal(3, 1)
   changeFreq    String?
   lastModified  DateTime?
-  status        PageStatus @default(PENDING)
-  lastCheckedAt DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  status            PageStatus @default(PENDING)
+  lastCheckedAt     DateTime?
+  hasSecurityIssues Boolean    @default(false)
+  seoScore          Int?
+  lastSeoCheckedAt  DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   site       Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
   pageChecks PageCheck[]
+  seoChecks  SeoCheck[]
   alerts     Alert[]
 
   @@unique([siteId, urlHash], name: "uniq_pages_site_url_hash")
@@ -201,14 +205,41 @@ model PageCheck {
   redirectUrl    String?
   contentHash    String?
   contentLength  Int?
-  title          String?
-  errorMessage   String?
+  title           String?
+  errorMessage    String?
+  securityIssues  Json?
+  externalScripts String[]
 
   page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
   @@index([pageId, checkedAt(sort: Desc)], name: "idx_page_checks_page_id_checked_at")
   @@index([siteId, checkedAt(sort: Desc)], name: "idx_page_checks_site_id_checked_at")
   @@map("page_checks")
+}
+
+model SeoCheck {
+  id               String   @id @default(uuid())
+  pageId           String
+  /// Denormalized for site-wide queries
+  siteId           String
+  checkedAt        DateTime @default(now())
+  score            Int
+  issues           Json
+  title            String?
+  description      String?
+  h1Count          Int?
+  canonicalUrl     String?
+  hasViewport      Boolean?
+  hasOgTags        Boolean?
+  hasSchema        Boolean?
+  imagesMissingAlt Int?
+  isIndexable      Boolean?
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, checkedAt(sort: Desc)], name: "idx_seo_checks_page_id_checked_at")
+  @@index([siteId], name: "idx_seo_checks_site_id")
+  @@map("seo_checks")
 }
 
 model Alert {

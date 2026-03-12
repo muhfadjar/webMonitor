@@ -5,6 +5,7 @@ import { schedulerQueue } from './queues'
 import { siteDiscoveryWorker } from './workers/site-discovery.worker'
 import { pageCheckWorker } from './workers/page-check.worker'
 import { sslCheckWorker } from './workers/ssl-check.worker'
+import { seoCheckWorker } from './workers/seo-check.worker'
 import { schedulerWorker } from './workers/scheduler.worker'
 
 const TICK_CRON = process.env.SCHEDULER_TICK_CRON ?? '* * * * *'         // every 1 min
@@ -47,6 +48,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
     siteDiscoveryWorker.close(),
     pageCheckWorker.close(),
     sslCheckWorker.close(),
+    seoCheckWorker.close(),
     schedulerWorker.close(),
   ])
 
@@ -67,6 +69,7 @@ async function main(): Promise<void> {
   console.log('  • site-discovery')
   console.log('  • page-check')
   console.log('  • ssl-check')
+  console.log('  • seo-check')
   console.log('  • scheduler')
 }
 

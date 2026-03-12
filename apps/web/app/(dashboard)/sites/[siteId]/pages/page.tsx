@@ -78,6 +78,8 @@ export default async function SitePagesPage({
     url: p.url,
     status: p.status,
     lastCheckedAt: p.lastCheckedAt?.toISOString() ?? null,
+    hasSecurityIssues: p.hasSecurityIssues,
+    seoScore: p.seoScore,
     pageChecks: p.pageChecks.map((c) => ({
       httpStatus: c.httpStatus,
       responseTimeMs: c.responseTimeMs,

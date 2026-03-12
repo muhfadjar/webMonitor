@@ -3,8 +3,8 @@ import crypto from 'crypto'
 import dns from 'dns/promises'
 import { URL } from 'url'
 import { QUEUES, JOB_PRIORITY } from '@webmonitor/shared'
-import type { SiteDiscoveryJobData, PageCheckJobData } from '@webmonitor/shared'
-import { connection, pageCheckQueue } from '../queues'
+import type { SiteDiscoveryJobData, PageCheckJobData, SeoCheckJobData } from '@webmonitor/shared'
+import { connection, pageCheckQueue, seoCheckQueue } from '../queues'
 import { db } from '../lib/db'
 import { fetchSiteRoot } from '../lib/http'
 import { checkSsl } from '../lib/ssl'
@@ -183,6 +183,18 @@ async function processJob(job: Job<SiteDiscoveryJobData>): Promise<void> {
       await pageCheckQueue.addBulk(jobPayloads)
       log('Page-check jobs enqueued', { count: jobPayloads.length })
       await publishEvent({ type: 'page_checks_queued', siteId, payload: { count: jobPayloads.length } })
+
+      // Enqueue SEO-check jobs for all discovered pages (low priority — runs after HTTP checks)
+      const seoJobPayloads: Array<{ name: string; data: SeoCheckJobData; opts: object }> = []
+      for (const page of pendingPages) {
+        seoJobPayloads.push({
+          name: `seo:${page.id}`,
+          data: { pageId: page.id, siteId, url: page.url },
+          opts: { priority: JOB_PRIORITY.LOW },
+        })
+      }
+      await seoCheckQueue.addBulk(seoJobPayloads)
+      log('SEO-check jobs enqueued', { count: seoJobPayloads.length })
     }
 
     // ── Step 8: Mark site active ─────────────────────────────────────────────

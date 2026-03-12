@@ -11,6 +11,8 @@ interface PageRow {
   url: string
   status: string
   lastCheckedAt: string | null
+  hasSecurityIssues: boolean
+  seoScore: number | null
   pageChecks: Array<{
     httpStatus: number | null
     responseTimeMs: number | null
@@ -23,11 +25,25 @@ interface PagesTableProps {
   pages: PageRow[]
 }
 
+function SeoScoreBadge({ score }: { score: number | null }) {
+  if (score === null) return <span className="text-xs text-muted-foreground">—</span>
+  const color =
+    score >= 80 ? 'bg-green-100 text-green-700' :
+    score >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-red-100 text-red-700'
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${color}`}>
+      {score}
+    </span>
+  )
+}
+
 export function PagesTable({ siteId, pages }: PagesTableProps) {
   const router = useRouter()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [seoLoading, setSeoLoading] = useState<string | null>(null)
 
   const allSelected = pages.length > 0 && selected.size === pages.length
   const someSelected = selected.size > 0 && !allSelected
@@ -72,6 +88,20 @@ export function PagesTable({ siteId, pages }: PagesTableProps) {
     }
   }
 
+  async function handleCheckSeo(pageId: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    setSeoLoading(pageId)
+    try {
+      await fetch(`/api/sites/${siteId}/pages/${pageId}/seo-check`, { method: 'POST' })
+      setTimeout(() => {
+        setSeoLoading(null)
+        router.refresh()
+      }, 1500)
+    } catch {
+      setSeoLoading(null)
+    }
+  }
+
   return (
     <div className="space-y-2">
       {/* Bulk action bar — only visible when items are selected */}
@@ -109,6 +139,8 @@ export function PagesTable({ siteId, pages }: PagesTableProps) {
               </th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">URL</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Security</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">SEO</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">HTTP</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Response</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Last Check</th>
@@ -117,7 +149,7 @@ export function PagesTable({ siteId, pages }: PagesTableProps) {
           <tbody>
             {pages.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-sm text-muted-foreground">
+                <td colSpan={8} className="px-6 py-8 text-center text-sm text-muted-foreground">
                   No pages found.
                 </td>
               </tr>
@@ -125,6 +157,7 @@ export function PagesTable({ siteId, pages }: PagesTableProps) {
               pages.map((page) => {
                 const check = page.pageChecks[0]
                 const isChecked = selected.has(page.id)
+                const isSeoChecking = seoLoading === page.id
                 return (
                   <tr
                     key={page.id}
@@ -150,6 +183,31 @@ export function PagesTable({ siteId, pages }: PagesTableProps) {
                     </td>
                     <td className="px-4 py-2">
                       <PageStatusBadge status={page.status as 'UP' | 'DOWN' | 'ERROR' | 'PENDING' | 'REDIRECT'} />
+                    </td>
+                    <td className="px-4 py-2">
+                      {page.hasSecurityIssues ? (
+                        <span
+                          title="Security issues detected"
+                          className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
+                        >
+                          ⚠ Risk
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2">
+                        <SeoScoreBadge score={page.seoScore} />
+                        <button
+                          onClick={(e) => handleCheckSeo(page.id, e)}
+                          disabled={isSeoChecking}
+                          className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline disabled:opacity-50"
+                          title="Run SEO check"
+                        >
+                          {isSeoChecking ? '…' : 'Check'}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-2 tabular-nums text-muted-foreground">
                       {check?.httpStatus ?? '—'}
