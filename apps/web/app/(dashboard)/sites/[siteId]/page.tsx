@@ -34,12 +34,22 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
   const latestSsl = site.sslCertificates[0]
   const latestRobots = site.robotsEntries[0]
 
-  const [pagesUp, pagesDown, pagesError, pagesWithSecurityIssues] = await Promise.all([
+  const [pagesUp, pagesDown, pagesError, pagesWithSecurityIssues, seoAggregate] = await Promise.all([
     db.page.count({ where: { siteId: site.id, status: 'UP' } }),
     db.page.count({ where: { siteId: site.id, status: 'DOWN' } }),
     db.page.count({ where: { siteId: site.id, status: 'ERROR' } }),
     db.page.count({ where: { siteId: site.id, hasSecurityIssues: true } }),
+    db.page.aggregate({
+      where: { siteId: site.id, seoScore: { not: null } },
+      _avg: { seoScore: true },
+      _count: { seoScore: true },
+    }),
   ])
+
+  const avgSeoScore = seoAggregate._avg.seoScore !== null
+    ? Math.round(seoAggregate._avg.seoScore)
+    : null
+  const seoCheckedCount = seoAggregate._count.seoScore
 
   // Latest security findings across all pages
   const securityFindings = pagesWithSecurityIssues > 0
@@ -168,6 +178,29 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
                 )}
                 <Link href={`/sites/${site.id}/pages?security=1`} className="text-xs text-primary hover:underline">
                   View flagged pages →
+                </Link>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* SEO Score */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">SEO Score</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            {avgSeoScore === null ? (
+              <p className="text-muted-foreground">Not analyzed yet</p>
+            ) : (
+              <>
+                <p className={`text-2xl font-bold ${avgSeoScore >= 80 ? 'text-green-600' : avgSeoScore >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {avgSeoScore}
+                  <span className="text-sm font-normal text-muted-foreground">/100</span>
+                </p>
+                <p className="text-xs text-muted-foreground">avg across {seoCheckedCount} page{seoCheckedCount !== 1 ? 's' : ''}</p>
+                <Link href={`/sites/${site.id}/pages`} className="text-xs text-primary hover:underline">
+                  View pages →
                 </Link>
               </>
             )}

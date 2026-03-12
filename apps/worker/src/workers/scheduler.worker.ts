@@ -1,7 +1,7 @@
 import { Worker, type Job } from 'bullmq'
 import { QUEUES, JOB_PRIORITY } from '@webmonitor/shared'
-import type { SchedulerJobData, SiteDiscoveryJobData, SslCheckJobData, PageCheckJobData } from '@webmonitor/shared'
-import { connection, siteDiscoveryQueue, pageCheckQueue, sslCheckQueue } from '../queues'
+import type { SchedulerJobData, SiteDiscoveryJobData, SslCheckJobData, PageCheckJobData, SeoCheckJobData } from '@webmonitor/shared'
+import { connection, siteDiscoveryQueue, pageCheckQueue, sslCheckQueue, seoCheckQueue } from '../queues'
 import { db } from '../lib/db'
 
 const CONCURRENCY = 1
@@ -83,12 +83,14 @@ async function runPageTick(): Promise<void> {
       pageCheckIntervalMinutes: true,
       pages: {
         where: { status: { not: 'PENDING' } },
-        select: { id: true, url: true, siteId: true, lastCheckedAt: true },
+        select: { id: true, url: true, siteId: true, lastCheckedAt: true, lastSeoCheckedAt: true },
       },
     },
   })
 
   const pageJobs: Array<{ name: string; data: PageCheckJobData; opts: { priority: number } }> = []
+  const seoJobs: Array<{ name: string; data: SeoCheckJobData; opts: { priority: number } }> = []
+  const SEO_INTERVAL_MS = 24 * 60 * 60 * 1000 // re-analyze SEO at most once per 24h per page
 
   for (const site of sites) {
     const intervalMs = site.pageCheckIntervalMinutes * 60 * 1000
@@ -103,6 +105,18 @@ async function runPageTick(): Promise<void> {
           data: { pageId: page.id, siteId: page.siteId, url: page.url },
           opts: { priority: JOB_PRIORITY.LOW },
         })
+
+        const seoIsDue =
+          !page.lastSeoCheckedAt ||
+          now - page.lastSeoCheckedAt.getTime() >= SEO_INTERVAL_MS
+
+        if (seoIsDue) {
+          seoJobs.push({
+            name: `seo-tick:${page.id}`,
+            data: { pageId: page.id, siteId: page.siteId, url: page.url },
+            opts: { priority: JOB_PRIORITY.LOW },
+          })
+        }
       }
     }
   }
@@ -110,7 +124,8 @@ async function runPageTick(): Promise<void> {
   if (pageJobs.length === 0) return
 
   await pageCheckQueue.addBulk(pageJobs)
-  console.log(`[scheduler] page-tick: enqueued ${pageJobs.length} page-check jobs`)
+  if (seoJobs.length > 0) await seoCheckQueue.addBulk(seoJobs)
+  console.log(`[scheduler] page-tick: enqueued ${pageJobs.length} page-check, ${seoJobs.length} seo-check jobs`)
 }
 
 /**
