@@ -8,6 +8,7 @@ import { RecheckButton } from '@/components/RecheckButton'
 import { EditSiteForm } from '@/components/EditSiteForm'
 import { DeleteSiteButton } from '@/components/DeleteSiteButton'
 import { formatResponseTime, formatDate, timeAgo } from '@/lib/utils'
+import { TagChip } from '@/components/TagInput'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -80,10 +81,16 @@ export default async function SiteOverviewPage({ params }: { params: { siteId: s
             displayName: site.displayName,
             checkIntervalMinutes: site.checkIntervalMinutes,
             pageCheckIntervalMinutes: site.pageCheckIntervalMinutes,
+            tags: site.tags,
           }}
         />
         <DeleteSiteButton siteId={site.id} domain={site.domain} />
       </div>
+      {site.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {site.tags.map((tag) => <TagChip key={tag} tag={tag} />)}
+        </div>
+      )}
 
       {/* Info grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

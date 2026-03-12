@@ -6,13 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { TagInput } from '@/components/TagInput'
 
 export function AddSiteForm() {
   const router = useRouter()
   const [domain, setDomain] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [interval, setInterval] = useState('60')
+  const [interval, setInterval] = useState('10')
   const [pageInterval, setPageInterval] = useState('1440')
+  const [tags, setTags] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -29,6 +31,7 @@ export function AddSiteForm() {
           displayName: displayName || undefined,
           checkIntervalMinutes: Number(interval),
           pageCheckIntervalMinutes: Number(pageInterval),
+          tags,
         }),
       })
 
@@ -105,6 +108,12 @@ export function AddSiteForm() {
               onChange={(e) => setInterval(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">How often to check site health (HTTP, SSL, robots)</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <TagInput tags={tags} onChange={setTags} placeholder="Add tag… (Enter or comma)" />
+            <p className="text-xs text-muted-foreground">Optional labels to group and filter sites</p>
           </div>
 
           <div className="space-y-2">

@@ -76,9 +76,10 @@ model Site {
   domain               String     @unique
   displayName          String?
   status               SiteStatus @default(PENDING)
-  checkIntervalMinutes     Int        @default(60)
+  checkIntervalMinutes     Int        @default(10)
   pageCheckIntervalMinutes Int        @default(1440)
   serverId                 String?
+  tags                     String[]
   createdBy                String
   lastCheckedAt        DateTime?
   createdAt            DateTime   @default(now())

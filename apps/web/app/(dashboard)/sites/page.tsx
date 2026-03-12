@@ -5,18 +5,20 @@ import { Button } from '@/components/ui/button'
 import { SiteStatusBadge } from '@/components/StatusBadge'
 import { SslBadge } from '@/components/SslBadge'
 import { formatResponseTime, timeAgo } from '@/lib/utils'
+import { SitesImportExport } from '@/components/SitesImportExport'
+import { TagChip } from '@/components/TagInput'
 
 export const metadata = { title: 'Sites' }
 export const dynamic = 'force-dynamic'
 
-type SearchParams = { serverId?: string }
+type SearchParams = { serverId?: string; tag?: string }
 
 export default async function SitesPage({ searchParams }: { searchParams: SearchParams }) {
-  const { serverId } = searchParams
+  const { serverId, tag } = searchParams
 
   const [sites, servers] = await Promise.all([
     db.site.findMany({
-      where: serverId ? { serverId } : undefined,
+      where: (serverId || tag) ? { ...(serverId && { serverId }), ...(tag && { tags: { has: tag } }) } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
         siteChecks: {
@@ -39,6 +41,10 @@ export default async function SitesPage({ searchParams }: { searchParams: Search
     }),
   ])
 
+  // Collect all unique tags across all sites for the filter
+  const allSites = await db.site.findMany({ select: { tags: true } })
+  const allTags = [...new Set(allSites.flatMap((s) => s.tags))].sort()
+
   const activeServer = servers.find((s) => s.id === serverId)
 
   return (
@@ -53,10 +59,34 @@ export default async function SitesPage({ searchParams }: { searchParams: Search
             )}
           </p>
         </div>
-        <Link href="/sites/new">
-          <Button>Add Site</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <SitesImportExport />
+          <Link href="/sites/new">
+            <Button>Add Site</Button>
+          </Link>
+        </div>
       </div>
+
+      {/* Tag filter */}
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Link
+            href={serverId ? `/sites?serverId=${serverId}` : '/sites'}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${!tag ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-foreground'}`}
+          >
+            All tags
+          </Link>
+          {allTags.map((t) => (
+            <Link
+              key={t}
+              href={`/sites?tag=${encodeURIComponent(t)}${serverId ? `&serverId=${serverId}` : ''}`}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${tag === t ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-foreground'}`}
+            >
+              {t}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Server filter */}
       {servers.length > 0 && (
@@ -100,6 +130,7 @@ export default async function SitesPage({ searchParams }: { searchParams: Search
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">SSL</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Server</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Pages</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tags</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Last Check</th>
                   </tr>
                 </thead>
@@ -149,6 +180,15 @@ export default async function SitesPage({ searchParams }: { searchParams: Search
                         </td>
                         <td className="px-4 py-3 tabular-nums text-muted-foreground">
                           {site._count.pages}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {site.tags.map((t) => (
+                              <Link key={t} href={`/sites?tag=${encodeURIComponent(t)}`}>
+                                <TagChip tag={t} />
+                              </Link>
+                            ))}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
                           {timeAgo(site.lastCheckedAt)}

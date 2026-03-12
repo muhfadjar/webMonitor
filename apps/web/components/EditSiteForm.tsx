@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { TagInput } from '@/components/TagInput'
 
 interface EditSiteFormProps {
   siteId: string
@@ -13,6 +14,7 @@ interface EditSiteFormProps {
     displayName: string | null
     checkIntervalMinutes: number
     pageCheckIntervalMinutes: number
+    tags: string[]
   }
 }
 
@@ -22,6 +24,7 @@ export function EditSiteForm({ siteId, initialValues }: EditSiteFormProps) {
   const [displayName, setDisplayName] = useState(initialValues.displayName ?? '')
   const [checkInterval, setCheckInterval] = useState(String(initialValues.checkIntervalMinutes))
   const [pageInterval, setPageInterval] = useState(String(initialValues.pageCheckIntervalMinutes))
+  const [tags, setTags] = useState<string[]>(initialValues.tags)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -37,6 +40,7 @@ export function EditSiteForm({ siteId, initialValues }: EditSiteFormProps) {
           displayName: displayName || undefined,
           checkIntervalMinutes: Number(checkInterval),
           pageCheckIntervalMinutes: Number(pageInterval),
+          tags,
         }),
       })
 
@@ -84,6 +88,11 @@ export function EditSiteForm({ siteId, initialValues }: EditSiteFormProps) {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <TagInput tags={tags} onChange={setTags} placeholder="Add tag… (Enter or comma)" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

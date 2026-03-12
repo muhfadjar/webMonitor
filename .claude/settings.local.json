@@ -87,7 +87,14 @@
       "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5432/webmonitor\" pnpm exec prisma migrate dev --name add_seo_check)",
       "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" pnpm exec prisma migrate dev --name add_seo_check)",
       "Bash(pnpm build:*)",
-      "Bash(pnpm tsc:*)"
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm add:*)",
+      "Bash(python3:*)",
+      "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" pnpm exec prisma migrate dev --name add_site_tags)",
+      "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" /Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm --filter web exec tsx -e \":*)",
+      "Bash(DATABASE_URL=\"postgresql://webmonitor:changeme@localhost:5432/webmonitor\" /Users/carbon-pc2/.nvm/versions/node/v22.14.0/bin/pnpm exec prisma migrate dev --name set_default_check_interval_10min)",
+      "Bash(PGPASSWORD=changeme psql -h localhost -U webmonitor -d webmonitor -c 'UPDATE \"\"Site\"\" SET \"\"checkIntervalMinutes\"\" = 10;')",
+      "Bash(docker exec:*)"
     ]
   }
 }

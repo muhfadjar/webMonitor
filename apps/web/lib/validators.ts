@@ -37,11 +37,18 @@ const domainTransform = z
   })
 
 // ── Sites ────────────────────────────────────────────────────────────────────
+const tagsField = z
+  .array(z.string().min(1).max(50).regex(/^[a-zA-Z0-9_\-. ]+$/, 'Tags may only contain letters, numbers, spaces, hyphens, dots, and underscores'))
+  .max(20)
+  .default([])
+  .transform((tags) => [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))])
+
 export const CreateSiteSchema = z.object({
   domain: domainTransform,
   displayName: z.string().max(255).optional(),
-  checkIntervalMinutes: z.coerce.number().int().min(5).max(10080).default(60),
+  checkIntervalMinutes: z.coerce.number().int().min(5).max(10080).default(10),
   pageCheckIntervalMinutes: z.coerce.number().int().min(60).max(10080).default(1440),
+  tags: tagsField,
 })
 
 export const UpdateSiteSchema = z.object({
@@ -49,6 +56,7 @@ export const UpdateSiteSchema = z.object({
   checkIntervalMinutes: z.coerce.number().int().min(5).max(10080).optional(),
   pageCheckIntervalMinutes: z.coerce.number().int().min(60).max(10080).optional(),
   status: z.enum(['ACTIVE', 'PAUSED']).optional(),
+  tags: tagsField.optional(),
 })
 
 // ── Alerts ───────────────────────────────────────────────────────────────────
@@ -85,6 +93,7 @@ export const PaginationSchema = z.object({
 export const SiteListSchema = PaginationSchema.extend({
   status: z.enum(['PENDING', 'ACTIVE', 'ERROR', 'PAUSED']).optional(),
   serverId: z.string().uuid().optional(),
+  tag: z.string().max(50).optional(),
 })
 
 // ── Servers ──────────────────────────────────────────────────────────────────
